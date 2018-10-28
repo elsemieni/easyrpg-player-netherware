@@ -333,6 +333,12 @@ libeasyrpg_player_la_SOURCES = \
 	src/window_varlist.cpp \
 	src/window_varlist.h
 
+if STEAMSHIM_WIN
+libeasyrpg_player_la_SOURCES += \
+    steamshim/windows/steamshim_child.c \
+    steamshim/windows/steamshim_child.h
+endif
+
 if WANT_FMMIDI
 libeasyrpg_player_la_SOURCES += \
 	src/midiprogram.h \

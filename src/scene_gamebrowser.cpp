@@ -26,10 +26,10 @@
 #include "bitmap.h"
 #include "audio.h"
 
-#ifdef _WIN32
+/*#ifdef _WIN32
 	#define WIN32_LEAN_AND_MEAN
 	#include <Windows.h>
-#endif
+#endif*/
 
 namespace {
 	std::string browser_dir;
@@ -48,7 +48,7 @@ void Scene_GameBrowser::Start() {
 
 void Scene_GameBrowser::Continue() {
 #ifdef _WIN32
-	SetCurrentDirectory(L"..");
+	//SetCurrentDirectory(L"..");
 #endif
 
 	Main_Data::SetProjectPath(browser_dir);
@@ -167,8 +167,9 @@ void Scene_GameBrowser::UpdateGameListSelection() {
 
 void Scene_GameBrowser::BootGame() {
 #ifdef _WIN32
-	SetCurrentDirectory(Utils::ToWideString(gamelist_window->GetGamePath()).c_str());
-	const std::string& path = ".";
+	//SetCurrentDirectory(Utils::ToWideString(gamelist_window->GetGamePath()).c_str());
+	//const std::string& path = ".";
+	const std::string& path = gamelist_window->GetGamePath();
 #else
 	const std::string& path = gamelist_window->GetGamePath();
 #endif

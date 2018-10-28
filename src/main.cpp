@@ -18,12 +18,31 @@
 #include "player.h"
 #include <cstdlib>
 
+#ifdef STEAMSHIM_WIN
+#	if defined(_WIN32)
+#		include "../steamshim/windows/steamshim_child.h"
+#	else
+#		include "../steamshim/generic/steamshim_child.h"
+#	endif
+#endif
+
 // This is needed on Windows
 #ifdef USE_SDL
 #  include <SDL.h>
 #endif
 
 extern "C" int main(int argc, char* argv[]) {
+
+#ifdef STEAMSHIM_WIN
+	//Initialize steamshim
+	if (!STEAMSHIM_init()) {
+		printf("Please run Game instead\n");
+		return EXIT_FAILURE;
+	}
+
+	STEAMSHIM_requestStats();
+
+#endif
 	Player::Init(argc, argv);
 	Player::Run();
 

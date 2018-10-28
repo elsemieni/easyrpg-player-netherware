@@ -1,4 +1,4 @@
-This folder contains Steamshim parent.
+This folder contains Steamshim child.
 It comes in original and windows-compatible version.
 Original: Copyright (c) 2013-2015 Ryan C. Gordon.
 (https://hg.icculus.org/icculus/steamshim/)
