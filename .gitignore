@@ -1,0 +1,90 @@
+/bin/
+Makefile
+easyrpg-player
+*.a
+*.elf
+*.o
+*~
+*.orig
+*.bak
+
+# autotools
+/autom4te.cache/
+/easyrpg-player-*/
+/.libs/
+.deps/
+Makefile.in
+aclocal.m4
+config.h
+config.h.in
+config.status
+configure
+libtool
+/builds/autoconf/
+!/builds/autoconf/m4/ax_prog_doxygen.m4
+stamp-h1
+.dirstamp
+*.la
+*.lo
+/output
+/utils
+/directorytree
+
+# cmake
+CMakeFiles/
+CMakeCache.txt
+CPackConfig.cmake
+CPackSourceConfig.cmake
+CTestTestfile.cmake
+cmake_install.cmake
+
+# msvc
+/builds/vs20*/Debug/
+/builds/vs20*/Release/
+/builds/vs20*/*.*sdf
+/builds/vs20*/*.ncb
+/builds/vs20*/*.psess
+/builds/vs20*/*.suo
+/builds/vs20*/*.user
+/builds/vs20*/*.vsp*
+/builds/vs20*/*.pdb
+/builds/vs20*/*.lib
+/builds/vs20*/.vs/
+/builds/vs20*/ipch/
+/builds/vs20*/Player*/x86/
+/builds/vs20*/Player*/x64/
+/builds/vs20*/Player*/ARM/
+/resources/player.aps
+
+# IntelliJ
+.idea/
+
+# VS Code
+.vscode/
+compile_commands.json
+
+# doxygen
+/resources/Doxyfile
+/doc/
+
+# manual
+/resources/easyrpg-player.6
+
+# test/run artifacts
+easyrpg_log.txt
+/*.log
+/*.trs
+Testing/
+
+# distribution archives
+easyrpg-player-*.tar.*
+*.zip
+
+# osx
+__MACOSX
+.DS_Store
+
+# legacy
+/lib/liblcf/
+liblcf.pc
+.buildconfig
