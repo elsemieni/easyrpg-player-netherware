@@ -88,3 +88,5 @@ __MACOSX
 /lib/liblcf/
 liblcf.pc
 .buildconfig
+/steamshim-parent/sdk
+.idea
