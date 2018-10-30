@@ -51,6 +51,10 @@
 #include "utils.h"
 #include "transition.h"
 
+#ifdef STEAMSHIM_WIN
+#   include "../steamshim/windows/steamshim_child.h"
+#endif
+
 namespace {
 	constexpr int max_var_size_2k3 = 9999999;
 	constexpr int min_var_size_2k3 = -max_var_size_2k3;
@@ -1523,6 +1527,104 @@ bool Game_Interpreter::CommandPlaySound(RPG::EventCommand const& com) { // code 
 }
 
 bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com */) { // code 12310
+
+#ifdef STEAMSHIM_WIN
+	if ( Game_Variables.IsValid(2501) && Game_Variables.IsValid(2503) ) {
+
+		const STEAMSHIM_Event *e;
+		std::string variableName;
+
+		switch (Game_Variables[2501]) {
+			case -101100:
+				//request stats
+				STEAMSHIM_requestStats();
+				return true;;
+				break;
+			case -101101:
+				//pump for stats received
+				e = STEAMSHIM_pump();
+				if (e) {
+					//event received
+					switch (e->type) {
+						case SHIMEVENT_STATSRECEIVED:
+							Game_Variables[2501] = 1;
+							break;
+						case SHIMEVENT_STATSSTORED:
+							Game_Variables[2501] = 2;
+							break;
+						case SHIMEVENT_SETACHIEVEMENT:
+							Game_Variables[2501] = 3;
+							break;
+						case SHIMEVENT_GETACHIEVEMENT:
+							Game_Variables[2501] = 4;
+							break;
+						case SHIMEVENT_RESETSTATS:
+							Game_Variables[2501] = 5;
+							break;
+						case SHIMEVENT_SETSTATI:
+							Game_Variables[2501] = 6;
+							break;
+						case SHIMEVENT_GETSTATI:
+							Game_Variables[2501] = 7;
+							Game_Variables[2502] = e->ivalue;
+							break;
+						default:
+							Game_Variables[2501] = -1;
+							break;
+					}
+				} else {
+					//No event this time
+					Game_Variables[2501] = 0;
+				}
+				return true;;
+				break;
+			case -101102:
+				//get stat
+				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables[2502]);
+				//STEAMSHIM_getStatI(variableName.c_str());
+				Output::Warning(variableName.c_str());
+				STEAMSHIM_getStatI("BulletsFired");
+				return true;;
+				break;
+			case -101103:
+				//get archivement
+				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables[2502]);
+				//STEAMSHIM_getAchievement(variableName.c_str());
+				Output::Warning(variableName.c_str());
+				STEAMSHIM_getAchievement("KILL_FIRST_VICTIM");
+				return true;;
+				break;
+			case -101104:
+				//set statI
+				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables[2502]);
+				//STEAMSHIM_setStatI(variableName.c_str(), , Game_Variables[2503]);
+				Output::Warning(variableName.c_str());
+				STEAMSHIM_setStatI("BulletsFired", Game_Variables[2503]);
+				STEAMSHIM_storeStats();
+				return true;;
+				break;
+			case -101105:
+				//set archivement
+				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables[2502]);
+				//STEAMSHIM_setAchievement(variableName.c_str());
+				Output::Warning(variableName.c_str());
+				STEAMSHIM_setAchievement("KILL_FIRST_VICTIM", 1);
+				STEAMSHIM_storeStats();
+				return true;;
+				break;
+			case -101106:
+				//reset
+				STEAMSHIM_resetStats(1);
+    			STEAMSHIM_storeStats();
+    			return true;;
+    			break;
+			default:
+				//default effect: execute End Event Processing
+				break;
+		}
+	}
+
+#endif
 	index = list.size();
 	return true;
 }

@@ -18,12 +18,16 @@
 #include "player.h"
 #include <cstdlib>
 
-#ifdef STEAMSHIM_WIN
+/*#ifdef STEAMSHIM_WIN
 #	if defined(_WIN32)
 #		include "../steamshim/windows/steamshim_child.h"
 #	else
 #		include "../steamshim/generic/steamshim_child.h"
 #	endif
+#endif*/
+
+#ifdef STEAMSHIM_WIN
+#   include "../steamshim/windows/steamshim_child.h"
 #endif
 
 // This is needed on Windows
@@ -45,6 +49,11 @@ extern "C" int main(int argc, char* argv[]) {
 #endif
 	Player::Init(argc, argv);
 	Player::Run();
+
+#ifdef STEAMSHIM_WIN
+	//Shutdown steamshim
+    STEAMSHIM_deinit();
+#endif
 
 	return EXIT_SUCCESS;
 }
