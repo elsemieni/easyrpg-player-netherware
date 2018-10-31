@@ -51,8 +51,8 @@
 #include "utils.h"
 #include "transition.h"
 
-#ifdef STEAMSHIM_WIN
-#   include "../steamshim/windows/steamshim_child.h"
+#ifdef STEAMSHIM
+#   include "../steamshim/steamshim_child.h"
 #endif
 
 namespace {
@@ -1528,7 +1528,7 @@ bool Game_Interpreter::CommandPlaySound(RPG::EventCommand const& com) { // code 
 
 bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com */) { // code 12310
 
-#ifdef STEAMSHIM_WIN
+#ifdef STEAMSHIM
 	if ( Game_Variables.IsValid(2501) && Game_Variables.IsValid(2503) ) {
 
 		const STEAMSHIM_Event *e;
@@ -1581,42 +1581,39 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
 			case -101102:
 				//get stat
 				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables[2502]);
-				//STEAMSHIM_getStatI(variableName.c_str());
-				Output::Warning(variableName.c_str());
-				STEAMSHIM_getStatI("BulletsFired");
-				return true;;
+				STEAMSHIM_getStatI(variableName.c_str());
+				Game_Variables[2501] = 0;
+				return true;
 				break;
 			case -101103:
 				//get archivement
 				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables[2502]);
-				//STEAMSHIM_getAchievement(variableName.c_str());
-				Output::Warning(variableName.c_str());
-				STEAMSHIM_getAchievement("KILL_FIRST_VICTIM");
-				return true;;
+				STEAMSHIM_getAchievement(variableName.c_str());
+				Game_Variables[2501] = 0;
+				return true;
 				break;
 			case -101104:
 				//set statI
 				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables[2502]);
-				//STEAMSHIM_setStatI(variableName.c_str(), , Game_Variables[2503]);
-				Output::Warning(variableName.c_str());
-				STEAMSHIM_setStatI("BulletsFired", Game_Variables[2503]);
+				STEAMSHIM_setStatI(variableName.c_str(), Game_Variables[2503]);
 				STEAMSHIM_storeStats();
-				return true;;
+				Game_Variables[2501] = 0;
+				return true;
 				break;
 			case -101105:
 				//set archivement
 				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables[2502]);
-				//STEAMSHIM_setAchievement(variableName.c_str());
-				Output::Warning(variableName.c_str());
-				STEAMSHIM_setAchievement("KILL_FIRST_VICTIM", 1);
+				STEAMSHIM_setAchievement(variableName.c_str(), 1);
 				STEAMSHIM_storeStats();
-				return true;;
+				Game_Variables[2501] = 0;
+				return true;
 				break;
 			case -101106:
 				//reset
 				STEAMSHIM_resetStats(1);
     			STEAMSHIM_storeStats();
-    			return true;;
+    			Game_Variables[2501] = 0;
+    			return true;
     			break;
 			default:
 				//default effect: execute End Event Processing

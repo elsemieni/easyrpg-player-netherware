@@ -1,8 +1,7 @@
 This folder contains Steamshim parent.
-It comes in original and windows-compatible version.
 Original: Copyright (c) 2013-2015 Ryan C. Gordon.
 (https://hg.icculus.org/icculus/steamshim/)
-Windows-compatible is a modification of original one, used in the game
+This is a Windows-compatible modification of original one, used in the game
 Oneshot. (https://github.com/elizagamedev/mkxp-oneshot)
 
 See LICENSE.txt for license.
