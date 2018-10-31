@@ -183,6 +183,9 @@ void Player::Init(int argc, char *argv[]) {
 
 	DisplayUi.reset();
 
+	//netherware fix: Always run in windowed mode
+	window_flag = true;
+
 	if(! DisplayUi) {
 		DisplayUi = BaseUi::CreateUi
 			(SCREEN_TARGET_WIDTH,

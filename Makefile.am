@@ -387,6 +387,11 @@ easyrpg_player_SOURCES = src/main.cpp
 easyrpg_player_CXXFLAGS = $(libeasyrpg_player_la_CXXFLAGS)
 easyrpg_player_LDADD = libeasyrpg-player.la
 
+if WIN32RCINJ
+easyrpg_player_LDADD += \
+    resources/player.o
+endif
+
 # manual page
 if HAVE_A2X
 resources/easyrpg-player.6: resources/easyrpg-player.6.adoc

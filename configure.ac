@@ -162,6 +162,14 @@ AM_CONDITIONAL([STEAMSHIM], [test "x$enable_steamshim" = "xyes"])
 AM_COND_IF([STEAMSHIM],
     [AC_DEFINE(STEAMSHIM, 1, [Define to 1 for integrate Steamshim])],[])
 
+AC_ARG_ENABLE(win32rcinj,
+  AS_HELP_STRING(
+    [--enable-win32rcinj],
+    [Try to enable win32 resource inlcuding at linking, default: no]))
+AM_CONDITIONAL([WIN32RCINJ], [test "x$enable_win32rcinj" = "xyes"])
+AM_COND_IF([WIN32RCINJ],
+    [AC_DEFINE(WIN32RCINJ, 1, [Define to 1 for special windows resources fixes])],[])
+
 # ====================================================================================
 
 AC_CONFIG_FILES([Makefile
