@@ -386,6 +386,7 @@ libeasyrpg_player_la_LIBADD = \
 easyrpg_player_SOURCES = src/main.cpp
 easyrpg_player_CXXFLAGS = $(libeasyrpg_player_la_CXXFLAGS)
 easyrpg_player_LDADD = libeasyrpg-player.la
+easyrpg_player_LDFLAGS = -rpath /OOORIGIN/lib64
 
 if WIN32RCINJ
 easyrpg_player_LDADD += \
