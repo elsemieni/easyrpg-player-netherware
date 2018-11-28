@@ -145,7 +145,13 @@ void Main_Data::Init() {
 			// Apple Finder does not set the working directory
 			// It points to HOME instead. When it is HOME change it to
 			// the application directory instead
-			char* home = getenv("HOME");
+			
+			//netherware fix: use SDL_GetBasePath for project directory.
+			char* data_dir = SDL_GetBasePath();
+			project_path = data_dir;
+			free(data_dir);
+			
+			/*char* home = getenv("HOME");
 			char current_dir[255] = { 0 };
 			getcwd(current_dir, sizeof(current_dir));
 			if (!strcmp(current_dir, home)) {
@@ -154,7 +160,7 @@ void Main_Data::Init() {
 				project_path = data_dir;
 
 				free(data_dir);
-			}
+			}*/
 #  endif
 #endif
 		}
