@@ -1621,9 +1621,15 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
 		}
 	}
 
+#else
+	//netherware fix: if it's a standalone build and if I try to call steamshim function, do nothing.
+	if (!Game_Variables.IsValid(2501) || Game_Variables[2501] == 0 ) {
+		index = list.size();
+	}
 #endif
-	index = list.size();
+
 	return true;
+
 }
 
 bool Game_Interpreter::CommandGameOver(RPG::EventCommand const& /* com */) { // code 12420
