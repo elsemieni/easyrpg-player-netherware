@@ -172,6 +172,14 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     return 0;  // just in case.
 } // WinMain
 
+int main(HINSTANCE hInstance, HINSTANCE hPrevInstance,
+	LPSTR lpCmdLine, int nCmdShow)
+{
+	mainline();
+	ExitProcess(0);
+	return 0;  // just in case.
+} // WinMain
+
 
 #else  // everyone else that isn't Windows.
 
@@ -292,6 +300,7 @@ public:
     SteamBridge(PipeType _fd);
 	STEAM_CALLBACK(SteamBridge, OnUserStatsReceived, UserStatsReceived_t, m_CallbackUserStatsReceived);
 	STEAM_CALLBACK(SteamBridge, OnUserStatsStored, UserStatsStored_t, m_CallbackUserStatsStored);
+    STEAM_CALLBACK(SteamBridge, OnLeaderboardFindResult, LeaderboardFindResult_t, m_CallbackLeaderboardFindResult);
 
 private:
     PipeType fd;
@@ -312,6 +321,8 @@ typedef enum ShimCmd
     SHIMCMD_GETSTATF,
     SHIMCMD_GETPERSONANAME,
     SHIMCMD_GETCURRENTGAMELANGUAGE,
+    SHIMCMD_FINDLEADERBOARD,
+    SHIMCMD_UPLOADLEADERBOARDSCORE,
 } ShimCmd;
 
 typedef enum ShimEvent
@@ -328,6 +339,7 @@ typedef enum ShimEvent
     SHIMEVENT_GETSTATF,
     SHIMEVENT_GETPERSONANAME,
     SHIMEVENT_GETCURRENTGAMELANGUAGE,
+    SHIMEVENT_LEADERBOARDFINDRESULT,
 } ShimEvent;
 
 static bool write1ByteCmd(PipeType fd, const uint8 b1)
@@ -374,6 +386,14 @@ static inline bool writeStatsStored(PipeType fd, const bool okay)
     dbgpipe("Parent sending SHIMEVENT_STATSSTORED(%sokay).\n", okay ? "" : "!");
     return write2ByteCmd(fd, SHIMEVENT_STATSSTORED, okay ? 1 : 0);
 } // writeStatsStored
+
+static inline bool writeLeaderboardFindResult(PipeType fd, SteamLeaderboard_t leaderBoardID) {
+    dbgpipe("Parent sending SHIMEVENT_LEADERBOARDFINDRESULT(%d).\n", (uint64)leaderBoardID ); //FIXME si no lo reconoce, ver incluir <stdint.h>
+    //al carajo, lo mandare como string xD
+    char buffer[128];
+    sprintf(buffer, "%d", (uint64)leaderBoardID);
+    return writeString(fd, SHIMEVENT_LEADERBOARDFINDRESULT, buffer);
+}
 
 static bool writeAchievementSet(PipeType fd, const char *name, const bool enable, const bool okay)
 {
@@ -453,6 +473,7 @@ static inline bool writeGetStatF(PipeType fd, const char *name, const float val,
 SteamBridge::SteamBridge(PipeType _fd)
     : m_CallbackUserStatsReceived( this, &SteamBridge::OnUserStatsReceived )
 	, m_CallbackUserStatsStored( this, &SteamBridge::OnUserStatsStored )
+	, m_CallbackLeaderboardFindResult( this, &SteamBridge::OnLeaderboardFindResult )
 	, fd(_fd)
 {
 } // SteamBridge::SteamBridge
@@ -469,6 +490,13 @@ void SteamBridge::OnUserStatsStored(UserStatsStored_t *pCallback)
 	if (GAppID != pCallback->m_nGameID) return;
     writeStatsStored(fd, pCallback->m_eResult == k_EResultOK);
 } // SteamBridge::OnUserStatsStored
+
+void SteamBridge::OnLeaderboardFindResult(LeaderboardFindResult_t *pCallback)
+{
+    //if (GAppID != pCallback->m_nGameID) return;
+    if (pCallback->m_bLeaderboardFound == 0) return;
+    writeLeaderboardFindResult(fd, pCallback->m_hSteamLeaderboard );
+} // SteamBridge::OnLeaderboardFindResult
 
 
 static bool processCommand(const uint8 *buf, unsigned int buflen, PipeType fd)
@@ -610,6 +638,38 @@ static bool processCommand(const uint8 *buf, unsigned int buflen, PipeType fd)
         case SHIMCMD_GETCURRENTGAMELANGUAGE:
             dbgpipe("Parent sending SHIMEVENT_GETCURRENTGAMELANGUAGE.\n");
             writeString(fd, SHIMEVENT_GETCURRENTGAMELANGUAGE, GSteamApps->GetCurrentGameLanguage());
+            break;
+
+        case SHIMCMD_FINDLEADERBOARD:
+            //parametro es un string
+            //const uint8 *buf, unsigned int buflen, PipeType fd
+            if (buflen)
+            {
+                bool okay;
+                const char *name = (const char *) buf;
+                SteamAPICall_t hSteamAPICall = GSteamStats->FindLeaderboard( name );
+                //m_CallbackLeaderboardFindResult.Set( hSteamAPICall, SteamBridge::SteamBridge, &SteamBridge::OnLeaderboardFindResult );
+            }
+            break;
+
+        case SHIMCMD_UPLOADLEADERBOARDSCORE:
+            //parametro es un numero y string y un valor numero
+			
+			if (buflen)
+            {
+                const int32 val = *((int32 *) buf);
+                buf += sizeof (int32);
+                const char *name = (const char *) buf;
+                int boardID = atoi(name);
+
+                //llamar a lo correspondiente
+                bool okay;
+                okay = GSteamStats->UploadLeaderboardScore(
+                        (SteamLeaderboard_t) boardID,
+                        (ELeaderboardUploadScoreMethod) 1,
+                        val, NULL, 0 );
+
+            }
             break;
     } // switch
 

@@ -2,6 +2,7 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
+#include <stdio.h>
 typedef HANDLE PipeType;
 #define NULLPIPE NULL
 typedef unsigned __int8 uint8;
@@ -135,6 +136,8 @@ typedef enum ShimCmd
     SHIMCMD_GETSTATF,
     SHIMCMD_GETPERSONANAME,
     SHIMCMD_GETCURRENTGAMELANGUAGE,
+    SHIMCMD_FINDLEADERBOARD,
+    SHIMCMD_UPLOADLEADERBOARDSCORE,
 } ShimCmd;
 
 static int write1ByteCmd(const uint8 b1)
@@ -247,6 +250,7 @@ static const STEAMSHIM_Event *processEvent(const uint8 *buf, size_t buflen)
     PRINTGOTEVENT(SHIMEVENT_GETSTATF);
     PRINTGOTEVENT(SHIMEVENT_GETPERSONANAME);
     PRINTGOTEVENT(SHIMEVENT_GETCURRENTGAMELANGUAGE);
+    PRINTGOTEVENT(SHIMEVENT_LEADERBOARDFINDRESULT);
     #undef PRINTGOTEVENT
     else printf("Child got unknown shimevent %d.\n", (int) type);
     #endif
@@ -304,6 +308,13 @@ static const STEAMSHIM_Event *processEvent(const uint8 *buf, size_t buflen)
         case SHIMEVENT_GETPERSONANAME:
         case SHIMEVENT_GETCURRENTGAMELANGUAGE:
             strcpy(event.name, (const char *) buf);
+            break;
+
+        case SHIMEVENT_LEADERBOARDFINDRESULT:
+            //primero copiar el valor raw del string
+            strcpy(event.name, (const char *) buf);
+            //ahora pasalo a string
+            event.ivalue = (int) atoi(event.name);
             break;
 
         default:  /* uh oh */
@@ -459,5 +470,22 @@ void STEAMSHIM_getCurrentGameLanguage()
     dbgpipe("Child sending SHIMCMD_GETCURRENTGAMELANGUAGE().\n");
     write1ByteCmd(SHIMCMD_GETCURRENTGAMELANGUAGE);
 } /* STEAMSHIM_getCurrentGameLanguage */
+
+void STEAMSHIM_findLeaderboard(const char *name)
+{
+    if (isDead()) return;
+    dbgpipe("Child sending SHIMCMD_FINDLEADERBOARD('%s').\n", name);
+    writeStatThing(SHIMCMD_FINDLEADERBOARD, name, NULL, 0);
+} /* STEAMSHIM_findLeaderboard */
+
+void STEAMSHIM_uploadLeaderboardScore(const int _boardID, const int _val)
+{
+    char buffer[32];
+    const int32 val = (int32) _val;
+    if (isDead()) return;
+    sprintf(buffer, "%d", _boardID);
+    dbgpipe("Child sending SHIMCMD_UPLOADLEADERBOARDSCORE(%d, %d).\n", _boardID, _val);
+    writeStatThing(SHIMCMD_UPLOADLEADERBOARDSCORE, buffer, &val, sizeof (val));
+} /* STEAMSHIM_uploadLeaderboardScore */
 
 /* end of steamshim_child.c ... */

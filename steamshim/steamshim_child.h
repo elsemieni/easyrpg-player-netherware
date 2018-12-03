@@ -19,6 +19,7 @@ typedef enum STEAMSHIM_EventType
     SHIMEVENT_GETSTATF,
     SHIMEVENT_GETPERSONANAME,
     SHIMEVENT_GETCURRENTGAMELANGUAGE,
+    SHIMEVENT_LEADERBOARDFINDRESULT,
 } STEAMSHIM_EventType;
 
 /* not all of these fields make sense in a given event. */
@@ -47,6 +48,8 @@ void STEAMSHIM_setStatF(const char *name, const float val);
 void STEAMSHIM_getStatF(const char *name);
 void STEAMSHIM_getPersonaName();
 void STEAMSHIM_getCurrentGameLanguage();
+void STEAMSHIM_findLeaderboard(const char *name);
+void STEAMSHIM_uploadLeaderboardScore(const int _boardID, const int _val);
 
 #ifdef __cplusplus
 }

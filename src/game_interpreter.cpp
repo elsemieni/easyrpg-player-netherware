@@ -1568,6 +1568,9 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
 							Game_Variables[2501] = 7;
 							Game_Variables[2502] = e->ivalue;
 							break;
+					    case SHIMEVENT_LEADERBOARDFINDRESULT:
+					        Game_Variables[2501] = 8;
+					        Game_Variables[2502] = e->ivalue;
 						default:
 							Game_Variables[2501] = -1;
 							break;
@@ -1612,6 +1615,20 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
 				//reset
 				STEAMSHIM_resetStats(1);
     			STEAMSHIM_storeStats();
+    			Game_Variables[2501] = 0;
+    			return true;
+    			break;
+    		case -101107:
+				//get scoreboard id
+				variableName = "SCOREBOARD_" + std::to_string(Game_Variables[2502]);
+				STEAMSHIM_findLeaderboard(variableName.c_str());
+    			Game_Variables[2501] = 0;
+    			return true;
+    			break;
+    		case -101108:
+				//set value to scoreboard
+				STEAMSHIM_uploadLeaderboardScore(Game_Variables[2502], Game_Variables[2503]);
+				STEAMSHIM_storeStats();
     			Game_Variables[2501] = 0;
     			return true;
     			break;
