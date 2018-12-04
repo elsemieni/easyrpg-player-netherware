@@ -24,6 +24,8 @@
 #include "audio_decoder.h"
 #include "decoder_opus.h"
 
+#include "output.h"
+
 static int custom_read(void* stream, unsigned char* ptr, int nbytes) {
 	FILE* f = reinterpret_cast<FILE*>(stream);
 	return fread(ptr, 1, nbytes, f);
@@ -56,11 +58,20 @@ OpusDecoder::~OpusDecoder() {
 
 bool OpusDecoder::Open(FILE* file) {
 	finished = false;
-
 	int res;
 	OpusFileCallbacks callbacks = {custom_read, custom_seek, custom_tell, custom_close};
 
-	oof = op_open_callbacks(file, &callbacks, nullptr, 0, &res);
+	//netherware fix: reconocer nSFX como OggS
+	char magic[4] = { 0 };
+	fread(magic, 4, 1, file);
+	if (strncmp(magic, "nSFx", 4)) {
+	    fseek(file, 0, SEEK_SET); //volver a 0
+	    oof = op_open_callbacks(file, &callbacks, nullptr, 0, &res);
+	} else {
+	    //inyecta headers de OggS
+	    oof = op_open_callbacks(file, &callbacks, (unsigned char*) "OggS", 4, &res);
+	}
+
 	if (res != 0) {
 		error_message = "Opus: Error reading file";
 		op_free(oof);

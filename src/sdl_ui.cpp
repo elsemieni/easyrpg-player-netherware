@@ -692,6 +692,18 @@ void SdlUi::ProcessJoystickAxisEvent(SDL_Event &evnt) {
 			keys[Input::Keys::JOY_AXIS_Y_UP] = false;
 			keys[Input::Keys::JOY_AXIS_Y_DOWN] = false;
 		}
+	//netherware fix: additional axis for xbox controllers
+	} else if (event.jaxis.axis == 2) {
+	    if (evnt.jaxis.value < -JOYSTICK_AXIS_SENSIBILITY) {
+			keys[Input::Keys::JOY_AXIS_Z_UP] = true;
+			keys[Input::Keys::JOY_AXIS_Z_DOWN] = false;
+		} else if (evnt.jaxis.value > JOYSTICK_AXIS_SENSIBILITY) {
+			keys[Input::Keys::JOY_AXIS_Z_UP] = false;
+			keys[Input::Keys::JOY_AXIS_Z_DOWN] = true;
+		} else {
+			keys[Input::Keys::JOY_AXIS_Z_UP] = false;
+			keys[Input::Keys::JOY_AXIS_Z_DOWN] = false;
+		}
 	}
 #endif
 }

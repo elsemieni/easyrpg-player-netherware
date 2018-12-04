@@ -94,30 +94,39 @@ void Input::InitButtons() {
 
 #if defined(USE_JOYSTICK) && defined(SUPPORT_JOYSTICK)
 	// FIXME: Random joystick keys mapping, better to read joystick configuration from .ini
-	buttons[UP].push_back(Keys::JOY_8);
-	buttons[DOWN].push_back(Keys::JOY_2);
-	buttons[LEFT].push_back(Keys::JOY_4);
-	buttons[RIGHT].push_back(Keys::JOY_6);
-	buttons[DECISION].push_back(Keys::JOY_1);
-	buttons[CANCEL].push_back(Keys::JOY_3);
-	buttons[SHIFT].push_back(Keys::JOY_5);
-	buttons[N0].push_back(Keys::JOY_10);
-	buttons[N1].push_back(Keys::JOY_11);
-	buttons[N2].push_back(Keys::JOY_12);
-	buttons[N3].push_back(Keys::JOY_13);
-	buttons[N4].push_back(Keys::JOY_14);
-	buttons[N5].push_back(Keys::JOY_15);
-	buttons[N6].push_back(Keys::JOY_16);
-	buttons[N7].push_back(Keys::JOY_17);
-	buttons[N8].push_back(Keys::JOY_18);
-	buttons[N9].push_back(Keys::JOY_19);
-	buttons[PLUS].push_back(Keys::JOY_20);
-	buttons[MINUS].push_back(Keys::JOY_21);
-	buttons[MULTIPLY].push_back(Keys::JOY_22);
-	buttons[DIVIDE].push_back(Keys::JOY_23);
-	buttons[PERIOD].push_back(Keys::JOY_24);
-	buttons[DEBUG_MENU].push_back(Keys::JOY_7);
-	buttons[DEBUG_THROUGH].push_back(Keys::JOY_9);
+	//buttons[UP].push_back(Keys::JOY_8);
+	//buttons[DOWN].push_back(Keys::JOY_2);
+	//buttons[LEFT].push_back(Keys::JOY_4);
+	//buttons[RIGHT].push_back(Keys::JOY_6);
+	buttons[DECISION].push_back(Keys::JOY_0);
+	buttons[CANCEL].push_back(Keys::JOY_1);
+	//buttons[SHIFT].push_back(Keys::JOY_5);
+	//buttons[N0].push_back(Keys::JOY_10);
+
+	buttons[N1].push_back(Keys::JOY_4);
+	buttons[N1].push_back(Keys::JOY_2);
+
+	//buttons[N2].push_back(Keys::JOY_12);
+
+	buttons[N3].push_back(Keys::JOY_5);
+	buttons[N3].push_back(Keys::JOY_3);
+
+	//buttons[N4].push_back(Keys::JOY_14);
+
+	buttons[N5].push_back(Keys::JOY_6);
+	buttons[N5].push_back(Keys::JOY_7);
+
+	//buttons[N6].push_back(Keys::JOY_16);
+	//buttons[N7].push_back(Keys::JOY_17);
+	//buttons[N8].push_back(Keys::JOY_18);
+	//buttons[N9].push_back(Keys::JOY_19);
+	//buttons[PLUS].push_back(Keys::JOY_20);
+	//buttons[MINUS].push_back(Keys::JOY_21);
+	//buttons[MULTIPLY].push_back(Keys::JOY_22);
+	//buttons[DIVIDE].push_back(Keys::JOY_23);
+	//buttons[PERIOD].push_back(Keys::JOY_24);
+	//buttons[DEBUG_MENU].push_back(Keys::JOY_7);
+	//buttons[DEBUG_THROUGH].push_back(Keys::JOY_9);
 #endif
 
 #if defined(USE_JOYSTICK_HAT)  && defined(SUPPORT_JOYSTICK_HAT)
@@ -133,6 +142,10 @@ void Input::InitButtons() {
 	buttons[RIGHT].push_back(Keys::JOY_AXIS_X_RIGHT);
 	buttons[DOWN].push_back(Keys::JOY_AXIS_Y_DOWN);
 	buttons[UP].push_back(Keys::JOY_AXIS_Y_UP);
+
+	//netherware fix: shoot
+	buttons[DECISION].push_back(Keys::JOY_AXIS_Z_DOWN);
+	buttons[DECISION].push_back(Keys::JOY_AXIS_Z_UP);
 #endif
 
 #if defined(USE_TOUCH) && defined(SUPPORT_TOUCH)

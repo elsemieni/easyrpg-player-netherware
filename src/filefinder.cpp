@@ -661,8 +661,9 @@ std::string FileFinder::FindMusic(const std::string& name) {
 	return FindDefault("Music", name);
 #endif
 
+	//netherware fix: add nsfx as audio format
 	static const char* MUSIC_TYPES[] = {
-		".opus", ".oga", ".ogg", ".wav", ".mid", ".midi", ".mp3", ".wma", nullptr };
+		".nsfx", ".opus", ".oga", ".ogg", ".wav", ".mid", ".midi", ".mp3", ".wma", nullptr };
 	return FindFile("Music", name, MUSIC_TYPES);
 }
 

@@ -173,9 +173,10 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 	}
 
 	// Try to use internal OGG decoder
-	if (!strncmp(magic, "OggS", 4)) { // OGG
+	//Netherware fix: support for nsfx header
+	if (!strncmp(magic, "OggS", 4) || !strncmp(magic, "nSFx", 4)) { // OGG
 #ifdef HAVE_OPUS
-		fseek(file, 28, SEEK_SET);
+		fseek(file, 28, SEEK_SET); //28 el original
 		if (fread(magic, 4, 1, file) != 1)
 			return nullptr;
 		fseek(file, 0, SEEK_SET);
