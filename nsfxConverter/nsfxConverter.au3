@@ -21,7 +21,8 @@
         If @error Then ExitLoop
 
 		$fp = FileOpen ( $sFileName, $FO_BINARY )
-		$fop = FileOpen ( $sFileName & ".nsfx", $FO_BINARY +  $FO_OVERWRITE )
+		$fileNameOut = StringReplace($sFileName, "opus", "nsfx")
+		$fop = FileOpen ( $fileNameOut, $FO_BINARY +  $FO_OVERWRITE )
 		If $fp = -1 Then ExitLoop
 		If $fop = -1 Then ExitLoop
 
