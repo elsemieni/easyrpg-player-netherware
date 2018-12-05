@@ -82,7 +82,7 @@ void Input::InitButtons() {
 	buttons[PAGE_UP].push_back(Keys::PGUP);
 	buttons[PAGE_DOWN].push_back(Keys::PGDN);
 	buttons[RESET].push_back(Keys::F11); //Netherware fix: remap buttons
-	buttons[FAST_FORWARD].push_back(Keys::F);
+	//buttons[FAST_FORWARD].push_back(Keys::F); //Netherware fix: disable fast foward
 
 #if defined(USE_MOUSE) && defined(SUPPORT_MOUSE)
 	buttons[DECISION].push_back(Keys::MOUSE_LEFT);
