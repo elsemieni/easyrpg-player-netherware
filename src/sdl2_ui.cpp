@@ -52,6 +52,9 @@
 #include "player.h"
 #include "bitmap.h"
 
+//netherware fix: include game switches for some event manipulating
+#include "game_switches.h"
+
 #include "audio.h"
 
 //netherware fix : global joystick handler
@@ -494,7 +497,7 @@ void Sdl2Ui::ProcessEvent(SDL_Event &evnt) {
 	            //evnt.which = index joystick de cual se agrego
                 SDL_JoyDeviceEvent &evtt = (SDL_JoyDeviceEvent&) evnt;
                 //Output::Warning("SDL_JOYDEVICEADDED %d", evtt.which);
-                if (evtt.which == 0 && !NethGloJoystickHandler) {
+                if (/*evtt.which == 0 &&*/ !NethGloJoystickHandler) {
                     NethGloJoystickHandler = SDL_JoystickOpen(0);
                 }
 	        }
@@ -506,7 +509,12 @@ void Sdl2Ui::ProcessEvent(SDL_Event &evnt) {
                 //evnt.which = index joystick de cual se quito
                 SDL_JoyDeviceEvent &evtt = (SDL_JoyDeviceEvent&) evnt;
                 //Output::Warning("SDL_JOYDEVICEREMOVED %d", evtt.which);
-                if (evtt.which == 0) {
+                if (true) { //if (evtt.which == 0) {
+                    //forzar pausa en el juego
+                    if (&Game_Switches && Game_Switches.IsValid(2241)) {
+                        Game_Switches[2241] = 1;
+                    }
+
                     SDL_JoystickClose(NethGloJoystickHandler);
                     NethGloJoystickHandler = nullptr;
                 }
