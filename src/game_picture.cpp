@@ -80,8 +80,17 @@ void Game_Picture::UpdateSprite() {
 		sprite->SetBitmap(sheet_bitmap);
 	}
 
-	sprite->SetX((int)data.current_x);
-	sprite->SetY((int)data.current_y);
+	//netherware fix: patch to allow screen shake
+	//referenced by https://github.com/EasyRPG/Player/pull/1548
+	int x = data.current_x;
+	int y = data.current_y;
+	if (data.flags.affected_by_shake) {
+		x -= Main_Data::game_data.screen.shake_position;
+		y += Main_Data::game_data.screen.shake_position_y;
+	}
+	sprite->SetX(x);
+	sprite->SetY(y);
+
 	if (Player::IsMajorUpdatedVersion()) {
 		// Battle Animations are above pictures
 		int priority = Drawable::GetPriorityForMapLayer(data.map_layer);
@@ -109,6 +118,18 @@ void Game_Picture::UpdateSprite() {
 						 (int) (data.current_green * 128 / 100),
 						 (int) (data.current_blue * 128 / 100),
 						 (int) (data.current_sat * 128 / 100)));
+
+	//netherware fix: add support to screen flash!
+	//referenced by https://github.com/EasyRPG/Player/pull/1549
+	if (data.flags.affected_by_flash) {
+		int flash_level = 0;
+		int flash_time = 0;
+		auto flash = Main_Data::game_screen->GetFlash(flash_level, flash_time);
+		if (flash_time > 0) {
+			flash.alpha = flash_level;
+			sprite->Flash(flash, flash_time);
+		}
+	}
 }
 
 void Game_Picture::Show(const ShowParams& params) {

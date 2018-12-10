@@ -143,8 +143,10 @@ void Scene_Map::Update() {
 
 	Main_Data::game_party->UpdateTimers();
 
-	Game_Map::Update();
+	//netherware fix: invert order to allow flash screen
+	//referenced by: https://github.com/EasyRPG/Player/pull/1549
 	Main_Data::game_screen->Update();
+	Game_Map::Update();
 	spriteset->Update();
 	message_window->Update();
 

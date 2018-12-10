@@ -100,7 +100,7 @@ private:
 	RPG::SaveScreen& data;
 	int flash_sat;		// RPGMaker bug: this isn't saved
 	int flash_period;	// RPGMaker bug: this isn't saved
-	int shake_direction;
+	//int shake_direction; //netherware fix: referenced by https://github.com/EasyRPG/Player/pull/1548
 
 	std::string movie_filename;
 	int movie_pos_x;

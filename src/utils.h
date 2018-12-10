@@ -230,6 +230,20 @@ namespace Utils {
 	 */
 	std::string ReplacePlaceholders(const std::string& text_template, std::vector<char> types, std::vector<std::string> values);
 
+	//netherware fix: patch to allow screen shake
+	//referenced by https://github.com/EasyRPG/Player/pull/1548
+	/**
+	 * @return value clamped between min and max
+ 	*/
+	template <typename T> T Clamp(T value, const T& minv, const T& maxv);
+
 } // namespace Utils
+
+//netherware fix: patch to allow screen shake
+//referenced by https://github.com/EasyRPG/Player/pull/1548
+template <typename T>
+inline T Utils::Clamp(T value, const T& minv, const T& maxv) {
+	return (value < minv) ? (minv) : ((value > maxv) ? maxv : value);
+}
 
 #endif
