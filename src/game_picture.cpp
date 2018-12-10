@@ -114,10 +114,21 @@ void Game_Picture::UpdateSprite() {
 		(int)(255 * (100 - data.current_bot_trans) / 100));
 	if (data.current_bot_trans != data.current_top_trans)
 		sprite->SetBushDepth(sprite->GetHeight() / 2);
-	sprite->SetTone(Tone((int) (data.current_red * 128 / 100),
+	//netherware fix: patch to allow pic tint
+	//referenced by https://github.com/EasyRPG/Player/pull/1545
+	/*sprite->SetTone(Tone((int) (data.current_red * 128 / 100),
 						 (int) (data.current_green * 128 / 100),
 						 (int) (data.current_blue * 128 / 100),
-						 (int) (data.current_sat * 128 / 100)));
+						 (int) (data.current_sat * 128 / 100)));*/
+	auto tone = Tone((int) (data.current_red * 128 / 100),
+					 (int) (data.current_green * 128 / 100),
+					 (int) (data.current_blue * 128 / 100),
+					 (int) (data.current_sat * 128 / 100));
+	if (data.flags.affected_by_tint) {
+		auto screen_tone = Main_Data::game_screen->GetTone();
+		tone = Blend(tone, screen_tone);
+	}
+	sprite->SetTone(tone);
 
 	//netherware fix: add support to screen flash!
 	//referenced by https://github.com/EasyRPG/Player/pull/1549

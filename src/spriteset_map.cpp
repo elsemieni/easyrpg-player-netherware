@@ -99,6 +99,7 @@ void Spriteset_Map::Update() {
 		}
 	}
 
+	airship_shadow->SetTone(new_tone); //netherware fix: referenced by https://github.com/EasyRPG/Player/pull/1545
 	airship_shadow->Update();
 
 	timer1->Update();
