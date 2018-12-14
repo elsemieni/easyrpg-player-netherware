@@ -51,6 +51,11 @@ void Game_Screen::CreatePicturesFromSave() {
 }
 
 void Game_Screen::Reset() {
+	//netherware fix: https://github.com/EasyRPG/Player/pull/1555
+	if (Main_Data::game_data.pictures.size() < pictures.size()) {
+		pictures.resize(Main_Data::game_data.pictures.size());
+	}
+
 	for (auto& p : pictures) {
 		if (p) {
 			p->Erase(false);

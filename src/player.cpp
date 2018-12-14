@@ -790,6 +790,10 @@ void Player::LoadSavegame(const std::string& save_name) {
 		Output::Error("%s", LcfReader::GetError().c_str());
 	}
 
+    //netherware fix: https://github.com/EasyRPG/Player/pull/1433/
+    Scene::PopUntil(Scene::Title);
+    Game_Temp::Init();
+
 	Main_Data::game_data = *save.get();
 	Main_Data::game_data.system.Fixup();
 

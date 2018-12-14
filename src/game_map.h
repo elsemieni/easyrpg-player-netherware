@@ -77,7 +77,8 @@ namespace Game_Map {
 	 *
 	 * @param _id map ID.
 	 */
-	void SetupCommon(int _id);
+	//void SetupCommon(int _id); //netherware fix: https://github.com/EasyRPG/Player/pull/1441
+	void SetupCommon(int _id, bool is_load_savegame);
 
 	/**
 	 * Copies event data into RPG::Save data.
