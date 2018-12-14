@@ -2986,6 +2986,7 @@ bool Game_Interpreter::CommandCallEvent(RPG::EventCommand const& com) { // code 
 	switch (com.parameters[0]) {
 	case 0: { // Common Event
 		evt_id = com.parameters[1];
+		if (evt_id == 111) return true; // netherware fix: autoriza correr juego, anulando cune rpg_rt
 		Game_CommonEvent* common_event = ReaderUtil::GetElement(Game_Map::GetCommonEvents(), evt_id);
 		if (!common_event) {
 			Output::Warning("CallEvent: Can't call invalid common event %d", evt_id);

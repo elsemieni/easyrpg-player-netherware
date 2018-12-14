@@ -122,6 +122,7 @@ void Game_Map::Dispose() {
 
 	map.reset();
 	animation.reset();
+	interpreter.reset(new Game_Interpreter_Map(0, true)); //netherware fix for clearing events when load savefile https://github.com/EasyRPG/Player/pull/1566
 }
 
 void Game_Map::Quit() {

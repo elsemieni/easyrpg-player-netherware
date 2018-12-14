@@ -110,12 +110,12 @@ void Graphics::UpdateTitle() {
 
 	std::stringstream title;
 	if (!Player::game_title.empty()) {
-		title << Player::game_title << " - ";
+		title << Player::game_title << " ";
 	}
 	title << GAME_TITLE;
 
 	if (Player::fps_flag) {
-		title << " - " << fps_overlay->GetFpsString();
+		title << " " << fps_overlay->GetFpsString();
 	}
 
 	DisplayUi->SetTitle(title.str());
