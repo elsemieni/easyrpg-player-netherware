@@ -189,6 +189,7 @@ namespace Input {
 			JOY_AXIS_X_RIGHT,
 			JOY_AXIS_Y_DOWN,
 			JOY_AXIS_Y_UP,
+
 			JOY_AXIS_Z_DOWN, //netherware fix: aditional axis for xbox controllers
 			JOY_AXIS_Z_UP,
 #endif

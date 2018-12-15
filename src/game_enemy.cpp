@@ -48,6 +48,18 @@ void Game_Enemy::Setup(int enemy_id) {
 	flying_offset = 0;
 }
 
+int Game_Enemy::MaxHpValue() const {
+	return Player::IsRPG2k() ? 9999 : 99999;
+}
+
+int Game_Enemy::MaxStatBattleValue() const {
+	return 9999;
+}
+
+int Game_Enemy::MaxStatBaseValue() const {
+	return 999;
+}
+
 const std::vector<int16_t>& Game_Enemy::GetStates() const {
 	return states;
 }
@@ -129,22 +141,6 @@ int Game_Enemy::GetSp() const {
 
 void Game_Enemy::SetHp(int _hp) {
 	hp = std::min(std::max(_hp, 0), GetMaxHp());
-}
-
-void Game_Enemy::ChangeHp(int hp) {
-	SetHp(GetHp() + hp);
-
-	if (this->hp == 0) {
-		// Death
-		SetGauge(0);
-		SetDefending(false);
-		SetCharged(false);
-		RemoveAllStates();
-		AddState(1);
-	} else {
-		// Back to life
-		RemoveState(1);
-	}
 }
 
 void Game_Enemy::SetSp(int _sp) {
@@ -261,7 +257,7 @@ bool Game_Enemy::IsActionValid(const RPG::EnemyAction& action) {
 	case RPG::EnemyAction::ConditionType_always:
 		return true;
 	case RPG::EnemyAction::ConditionType_switch:
-		return Game_Switches[action.switch_id];
+		return Game_Switches.Get(action.switch_id);
 	case RPG::EnemyAction::ConditionType_turn:
 		{
 			int turns = Game_Battle::GetTurn();
@@ -341,4 +337,8 @@ const RPG::EnemyAction* Game_Enemy::ChooseRandomAction() {
 	}
 
 	return nullptr;
+}
+
+bool Game_Enemy::IsTransparent() const {
+	return enemy->transparent;
 }

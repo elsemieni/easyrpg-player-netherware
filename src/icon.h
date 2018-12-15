@@ -15,12 +15,14 @@
  * along with EasyRPG Player. If not, see <http://www.gnu.org/licenses/>.
  */
 
-// This is DesolateCity logo scaled to 32x32 as raw RGBA pixels 
+// This is DesolateCity logo scaled to 32x32 as raw RGBA pixels
 //(netherware customization). The tools for converting this
 //are included in rgba_convert folder.
 
 // Include icons only for SDL2 builds without special treatment
 #if SDL_MAJOR_VERSION>1 && !defined(_WIN32)
+
+#define ICON_SIZE 32
 
 #define ICON_SIZE 32
 

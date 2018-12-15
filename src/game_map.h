@@ -27,6 +27,7 @@
 #include "game_vehicle.h"
 #include "rpg_encounter.h"
 #include "rpg_map.h"
+#include "rpg_mapinfo.h"
 
 class FileRequestAsync;
 
@@ -57,8 +58,9 @@ namespace Game_Map {
 
 	/**
 	 * Disposes Game_Map.
+	 * @param is_load_savegame true if we're calling this while loading a saved game.
 	 */
-	void Dispose();
+	void Dispose(bool is_load_savegame);
 
 	/**
 	 * Setups a map.
@@ -73,11 +75,17 @@ namespace Game_Map {
 	void SetupFromSave();
 
 	/**
+	 * Performs Setup on a map when teleport to self.
+	 *
+	 * @param map_id map ID.
+	 */
+	void SetupFromTeleportSelf();
+
+	/**
 	 * Shared code of the Setup methods.
 	 *
 	 * @param _id map ID.
 	 */
-	//void SetupCommon(int _id); //netherware fix: https://github.com/EasyRPG/Player/pull/1441
 	void SetupCommon(int _id, bool is_load_savegame);
 
 	/**
@@ -141,9 +149,10 @@ namespace Game_Map {
 	 * @param y tile y.
 	 * @param d direction
 	 * @param self Character to move.
+	 * @param force_through act as if self.SetThrough() == true
 	 * @return whether is passable.
 	 */
-	bool MakeWay(int x, int y, int d, const Game_Character& self);
+	bool MakeWay(int x, int y, int d, const Game_Character& self, bool force_through);
 
 	/**
 	 * Gets if a tile coordinate is passable in a direction.
@@ -230,6 +239,13 @@ namespace Game_Map {
 	void Update(bool only_parallel = false);
 
 	/**
+	 * Gets current map_info.
+	 *
+	 * @return current map_info.
+	 */
+	RPG::MapInfo const& GetMapInfo();
+
+	/**
 	 * Gets current map.
 	 *
 	 * @return current map.
@@ -291,10 +307,9 @@ namespace Game_Map {
 	void UpdateEncounterSteps();
 
 	/**
-	 * Resets encounter step counter based on the encounter rate using
-	 * Gaussian distribution.
+	 * Sets encounter_steps to steps.
 	 */
-	void ResetEncounterSteps();
+	void SetEncounterSteps(int steps);
 
 	/**
 	 * Gets possible encounters at a location.
@@ -549,8 +564,8 @@ namespace Game_Map {
 	void SetChipset(int id);
 
 	Game_Vehicle* GetVehicle(Game_Vehicle::Type which);
-	void SubstituteDown(int old_id, int new_id);
-	void SubstituteUp(int old_id, int new_id);
+	int SubstituteDown(int old_id, int new_id);
+	int SubstituteUp(int old_id, int new_id);
 
 	bool IsPassableTile(int bit, int tile_index);
 
@@ -637,17 +652,15 @@ namespace Game_Map {
 		/** Call this when you find out the width and height of the BG. */
 		void Initialize(int width, int height);
 
-		/** Reset the x- and y- position of the BG (eg. after a teleport). */
-		void ResetPosition();
+		/**
+		 * Reset the x- and y- position of the BG.
+		 *
+		 * @param init if true will always reset position, even on looping maps
+		 */
+		void UpdatePosition(bool init = false);
 
 		/** Update autoscrolling BG (call every frame). */
 		void Update();
-
-		/**
-		 * Scrolls the BG by the correct amount when the screen scrolls
-		 * by the given distances.
-		 */
-		void Scroll(int distance_right, int distance_down);
 
 		/** Change BG (eg. with a "Change Parallax BG" command). */
 		void ChangeBG(const Params& params);

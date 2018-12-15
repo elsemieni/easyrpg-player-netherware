@@ -19,7 +19,7 @@
 #define EP_OPTIONS_H
 
 /** Window title to show. */
-#define GAME_TITLE ""
+#define GAME_TITLE "" //netherware fix
 
 /** Targeted screen default width. */
 #define SCREEN_TARGET_WIDTH 320

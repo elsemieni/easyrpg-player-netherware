@@ -172,6 +172,9 @@ public:
 
 	Graphics::State& GetGraphicsState();
 
+	/** Called by the interpreter when an event finishes processing */
+	virtual void onCommandEnd() {}
+
 private:
 	/** Scene stack. */
 	static std::vector<std::shared_ptr<Scene> > instances;
@@ -189,6 +192,8 @@ private:
 	 * Graphic stack of the scene
 	 */
 	Graphics::State state;
+
+	static void DebugValidate(const char* caller);
 };
 
 #endif

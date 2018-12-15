@@ -39,12 +39,19 @@ namespace RPG {
  */
 class Game_Actor : public Game_Battler {
 public:
+	using RowType = RPG::SaveActor::RowType;
 	/**
 	 * Constructor.
 	 *
 	 * @param actor_id database actor ID.
 	 */
 	Game_Actor(int actor_id);
+
+	int MaxHpValue() const override;
+
+	int MaxStatBattleValue() const override;
+
+	int MaxStatBaseValue() const override;
 
 	/**
 	 * Sets up the game actor
@@ -72,7 +79,7 @@ public:
 	 * @param item_id ID if item to use
 	 * @return true if item affected anything
 	 */
-	bool UseItem(int item_id) override;
+	bool UseItem(int item_id, const Game_Battler* source) override;
 
 	/**
 	 * Checks if the actor is permitted to use the item at all.
@@ -121,19 +128,17 @@ public:
 	bool IsSkillUsable(int skill_id) const override;
 
 	/**
-	 * Returns the modifier by which skill costs are divided.
-	 *
-	 * @return modifier
-	 */
-	int GetSpCostModifier() const;
-
-	/**
 	 * Calculates the Skill costs including all modifiers.
 	 *
 	 * @param skill_id ID of skill to calculate.
 	 * @return needed skill cost.
 	 */
 	int CalculateSkillCost(int skill_id) const override;
+
+	/**
+	 * @return sp cost for attacking with weapon.
+	 */
+	int CalculateWeaponSpCost() const;
 
 	/**
 	 * Gets the actor ID.
@@ -294,6 +299,36 @@ public:
 	int GetAccessoryId() const;
 
 	/**
+	 * @return actor's weapon if equipped and type == RPG::Item::Type_weapon
+	 */
+	const RPG::Item* GetWeapon() const;
+
+	/**
+	 * @return actor's 2nd weapon if equipped and type == RPG::Item::Type_weapon
+	 */
+	const RPG::Item* Get2ndWeapon() const;
+
+	/**
+	 * @return actor's shield if equipped and type == RPG::Item::Type_shield
+	 */
+	const RPG::Item* GetShield() const;
+
+	/**
+	 * @return actor's armor if equipped and type == RPG::Item::Type_armor
+	 */
+	const RPG::Item* GetArmor() const;
+
+	/**
+	 * @return actor's helmet if equipped and type == RPG::Item::Type_helmet
+	 */
+	const RPG::Item* GetHelmet() const;
+
+	/**
+	 * @return actor's accessory if equipped and type == RPG::Item::Type_accessory
+	 */
+	const RPG::Item* GetAccessory() const;
+
+	/**
 	 * Gets actor current level.
 	 *
 	 * @return current level.
@@ -373,13 +408,6 @@ public:
 	 * @return true if strong defense
 	 */
 	bool HasStrongDefense() const override;
-
-	/**
-	 * Tests if the battler has a weapon that grants preemption.
-	 *
-	 * @return true if a weapon is having preempt attribute
-	 */
-	bool HasPreemptiveAttack() const override;
 
 	/**
 	 * Sets face graphic of actor.
@@ -492,7 +520,6 @@ public:
 
 	int GetHp() const override;
 	void SetHp(int _hp) override;
-	void ChangeHp(int hp) override;
 
 	int GetSp() const override;
 	void SetSp(int _sp) override;
@@ -730,23 +757,62 @@ public:
 	/**
 	 * Gets battle row for Rpg2k3 battles.
 	 *
-	 * @return row for Rpg2k3 battles (-1 front, 1 back).
+	 * @return row for Rpg2k3 battles
 	 */
-	int GetBattleRow() const;
+	RowType GetBattleRow() const;
 
 	/**
 	 * Sets battle row for Rpg2k3 battles.
 	 *
-	 * @param battle_row new row for Rpg2k3 battles (-1 front, 1 back).
+	 * @param battle_row new row for Rpg2k3 battles
 	 */
-	void SetBattleRow(int battle_row);
+	void SetBattleRow(RowType battle_row);
 
 	/**
-	 * Checks if the actor has an equipment that protects against terrain damage.
+	 * Tests if the battler has a weapon that grants preemption.
 	 *
-	 * @return Whether the actor avoid terrain damage.
+	 * @return true if a weapon is having preempt attribute
 	 */
-	bool PreventsTerrainDamage();
+	bool HasPreemptiveAttack() const override;
+
+	/**
+	 * Tests if the battler has a weapon that grants dual attack.
+	 *
+	 * @return true if a weapon is having dual attack attribute
+	 */
+	bool HasDualAttack() const;
+
+	/**
+	 * Tests if the battler has a weapon that grants attack all
+	 *
+	 * @return true if a weapon is having attack all attribute
+	 */
+	bool HasAttackAll() const;
+
+	/**
+	 * @return If the actor has weapon that ignores evasion
+	 */
+	bool AttackIgnoresEvasion() const;
+
+	/**
+	 * @return If the actor has equipment that protects against terrain damage.
+	 */
+	bool PreventsTerrainDamage() const;
+
+	/**
+	 * @return If the actor has an equipment that protects against critical hits.
+	 */
+	bool PreventsCritical() const;
+
+	/**
+	 * @return If the actor has an equipment that with physical evasion up.
+	 */
+	bool HasPhysicalEvasionUp() const;
+
+	/**
+	 * @return If the actor has an equipment with half sp cost.
+	 */
+	bool HasHalfSpCost() const;
 
 	int GetBattleAnimationId() const override;
 
@@ -757,6 +823,12 @@ public:
 	std::string GetLearningMessage(const RPG::Learning& learn) const;
 
 	BattlerType GetType() const override;
+
+	/**
+	 * @return true if the actor is controllable in battle.
+	 */
+	int IsControllable() const;
+
 private:
 	/**
 	 * @return Reference to the Actor data of the LDB

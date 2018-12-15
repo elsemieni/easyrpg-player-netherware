@@ -17,7 +17,10 @@
 
 // Headers
 #include "utils.h"
+#include "output.h"
 #include <cassert>
+#include <cstdint>
+#include <cinttypes>
 #include <stdio.h>
 #include <algorithm>
 #include <random>
@@ -264,7 +267,7 @@ std::string Utils::EncodeUTF(const std::u32string& str) {
 	return result;
 }
 
-#ifndef __amigaos4__
+#if !defined(__amigaos4__) && !defined(__AROS__)
 template<size_t WideSize>
 static std::wstring ToWideStringImpl(const std::string&);
 #if __SIZEOF_WCHAR_T__ == 4 || __WCHAR_MAX__ > 0x10000
@@ -394,8 +397,18 @@ bool Utils::ChanceOf(int32_t n, int32_t m) {
 	return GetRandomNumber(1, m) <= n;
 }
 
+bool Utils::PercentChance(float rate) {
+	constexpr auto scale = 0x1000000;
+	return GetRandomNumber(0, scale-1) < int32_t(rate * scale);
+}
+
+bool Utils::PercentChance(int rate) {
+	return GetRandomNumber(0, 99) < rate;
+}
+
 void Utils::SeedRandomNumberGenerator(int32_t seed) {
 	rng.seed(seed);
+	Output::Debug("Seeded the RNG with %" PRId32 ".", seed);
 }
 
 // via https://stackoverflow.com/questions/6089231/
@@ -406,7 +419,7 @@ std::string Utils::ReadLine(std::istream &is) {
 	std::streambuf* sb = is.rdbuf();
 
 	for(;;) {
-        	int c = sb->sbumpc();
+		int c = sb->sbumpc();
 		switch (c) {
 			case '\n':
 			return out;

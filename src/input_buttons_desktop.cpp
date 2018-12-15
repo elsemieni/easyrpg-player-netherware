@@ -143,7 +143,7 @@ void Input::InitButtons() {
 	buttons[DOWN].push_back(Keys::JOY_AXIS_Y_DOWN);
 	buttons[UP].push_back(Keys::JOY_AXIS_Y_UP);
 
-	//netherware fix: shoot
+		//netherware fix: shoot
 	buttons[DECISION].push_back(Keys::JOY_AXIS_Z_DOWN);
 	buttons[DECISION].push_back(Keys::JOY_AXIS_Z_UP);
 #endif

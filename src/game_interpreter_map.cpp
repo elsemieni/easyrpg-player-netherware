@@ -52,6 +52,7 @@ Game_Interpreter_Map::Game_Interpreter_Map(int depth, bool main_flag) :
 }
 
 bool Game_Interpreter_Map::SetupFromSave(const std::vector<RPG::SaveEventCommands>& save, int _index) {
+	Clear();
 	if (_index < (int)save.size()) {
 		event_id = save[_index].event_id;
 		if (event_id != 0) {
@@ -198,9 +199,9 @@ bool Game_Interpreter_Map::CommandRecallToLocation(RPG::EventCommand const& com)
 	int var_map_id = com.parameters[0];
 	int var_x = com.parameters[1];
 	int var_y = com.parameters[2];
-	int map_id = Game_Variables[var_map_id];
-	int x = Game_Variables[var_x];
-	int y = Game_Variables[var_y];
+	int map_id = Game_Variables.Get(var_map_id);
+	int x = Game_Variables.Get(var_x);
+	int y = Game_Variables.Get(var_y);
 
 	if (map_id == Game_Map::GetMapId()) {
 		player->MoveTo(x, y);
@@ -487,9 +488,9 @@ bool Game_Interpreter_Map::ContinuationShowInnStart(RPG::EventCommand const& /* 
 		// Full heal
 		std::vector<Game_Actor*> actors = Main_Data::game_party->GetActors();
 		for (Game_Actor* actor : actors) {
+			actor->RemoveAllStates();
 			actor->ChangeHp(actor->GetMaxHp());
 			actor->SetSp(actor->GetMaxSp());
-			actor->RemoveAllStates();
 		}
 		Graphics::GetTransition().Init(Transition::TransitionFadeOut, Scene::instance.get(), 36, true);
 		Game_System::BgmFade(800);
@@ -618,9 +619,12 @@ bool Game_Interpreter_Map::CommandPanScreen(RPG::EventCommand const& com) { // c
 		break;
 	case 3: // Reset
 		speed = com.parameters[3];
-		distance = std::max(std::abs(Game_Map::GetPanX()), std::abs(Game_Map::GetPanY())) / SCREEN_TILE_WIDTH;
 		waiting_pan_screen = com.parameters[4] != 0;
 		Game_Map::ResetPan(speed, waiting_pan_screen);
+		distance = std::max(
+				std::abs(Game_Map::GetPanX() - Game_Map::GetTargetPanX())
+				, std::abs(Game_Map::GetPanY() - Game_Map::GetTargetPanY()));
+		distance /= SCREEN_TILE_WIDTH;
 		break;
 	}
 

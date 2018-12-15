@@ -29,6 +29,7 @@
 #include "player.h"
 #include "game_temp.h"
 #include "game_map.h"
+#include "spriteset_battle.h"
 
 Game_Interpreter_Battle::Game_Interpreter_Battle(int depth, bool main_flag) :
 	Game_Interpreter(depth, main_flag) {
@@ -38,10 +39,6 @@ Game_Interpreter_Battle::Game_Interpreter_Battle(int depth, bool main_flag) :
 bool Game_Interpreter_Battle::ExecuteCommand() {
 	if (index >= list.size()) {
 		return CommandEnd();
-	}
-
-	if (Game_Battle::IsBattleAnimationWaiting()) {
-		return false;
 	}
 
 	RPG::EventCommand const& com = list[index];
@@ -165,13 +162,16 @@ bool Game_Interpreter_Battle::CommandChangeMonsterHP(RPG::EventCommand const& co
 	bool lose = com.parameters[1] > 0;
 	int hp = enemy.GetHp();
 
+	if (enemy.IsDead())
+		return true;
+
 	int change = 0;
 	switch (com.parameters[2]) {
 	case 0:
 		change = com.parameters[3];
 	    break;
 	case 1:
-		change = Game_Variables[com.parameters[3]];
+		change = Game_Variables.Get(com.parameters[3]);
 	    break;
 	case 2:
 		change = com.parameters[3] * hp / 100;
@@ -184,6 +184,7 @@ bool Game_Interpreter_Battle::CommandChangeMonsterHP(RPG::EventCommand const& co
 	enemy.ChangeHp(change);
 
 	if (enemy.IsDead()) {
+		Game_System::SePlay(Game_System::GetSystemSE(Game_System::SFX_EnemyKill));
 		Game_Battle::SetNeedRefresh(true);
 	}
 
@@ -202,7 +203,7 @@ bool Game_Interpreter_Battle::CommandChangeMonsterMP(RPG::EventCommand const& co
 		change = com.parameters[3];
 	    break;
 	case 1:
-		change = Game_Variables[com.parameters[3]];
+		change = Game_Variables.Get(com.parameters[3]);
 	    break;
 	}
 
@@ -222,9 +223,13 @@ bool Game_Interpreter_Battle::CommandChangeMonsterCondition(RPG::EventCommand co
 	int state_id = com.parameters[2];
 	if (remove) {
 		enemy.RemoveState(state_id);
+		if (state_id == RPG::State::kDeathID) {
+			Game_Battle::GetSpriteset().FindBattler(&enemy)->SetVisible(true);
+			Game_Battle::SetNeedRefresh(true);
+		}
 	} else {
-		if (state_id == 1) {
-			enemy.ChangeHp(-enemy.GetHp());
+		if (state_id == RPG::State::kDeathID) {
+			Game_Battle::GetSpriteset().FindBattler(&enemy)->SetVisible(false);
 			Game_Battle::SetNeedRefresh(true);
 		}
 		enemy.AddState(state_id);
@@ -310,15 +315,15 @@ bool Game_Interpreter_Battle::CommandConditionalBranchBattle(RPG::EventCommand c
 	switch (com.parameters[0]) {
 		case 0:
 			// Switch
-			result = Game_Switches[com.parameters[1]] == (com.parameters[2] == 0);
+			result = Game_Switches.Get(com.parameters[1]) == (com.parameters[2] == 0);
 			break;
 		case 1:
 			// Variable
-			value1 = Game_Variables[com.parameters[1]];
+			value1 = Game_Variables.Get(com.parameters[1]);
 			if (com.parameters[2] == 0) {
 				value2 = com.parameters[3];
 			} else {
-				value2 = Game_Variables[com.parameters[3]];
+				value2 = Game_Variables.Get(com.parameters[3]);
 			}
 			switch (com.parameters[4]) {
 				case 0:

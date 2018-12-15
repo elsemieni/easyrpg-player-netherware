@@ -20,6 +20,7 @@
 
 #include <string>
 #include <vector>
+#include "rpg_state.h"
 
 class Game_Battler;
 class Game_Party_Base;
@@ -40,6 +41,20 @@ namespace RPG {
  * simulation by calling Apply.
  */
 namespace Game_BattleAlgorithm {
+
+enum class Type {
+	Null,
+	Normal,
+	Skill,
+	Item,
+	Defend,
+	Observe,
+	Charge,
+	SelfDestruct,
+	Escape,
+	Transform,
+	NoMove,
+};
 
 class AlgorithmBase {
 public:
@@ -154,11 +169,32 @@ public:
 	bool IsPositive() const;
 
 	/**
+	 * Gets whether the action had absorb component.
+	 *
+	 * @return Whether action was absorb
+	 */
+	bool IsAbsorb() const;
+
+	/*
+	 * @return Whether target will be revived from death
+	 */
+	bool IsRevived() const;
+
+	/**
 	 * Gets the Battle Animation that is assigned to the Algorithm
 	 *
 	 * @return Battle Animation or NULL if no animation is assigned
 	 */
 	const RPG::Animation* GetAnimation() const;
+	const RPG::Animation* GetSecondAnimation() const;
+
+	/**
+	 * Checks if the animation has already played once
+	 *
+	 * @return Whether the animation played once
+	 */
+	bool HasAnimationPlayed() const;
+	bool HasSecondAnimationPlayed() const;
 
 	/**
 	 * Plays the battle animation on the targets.
@@ -170,13 +206,16 @@ public:
 	 *                  targets (required for reflect)
 	 */
 	void PlayAnimation(bool on_source = false);
+	void PlaySecondAnimation(bool on_source = false);
+
+	void PlaySoundAnimation(bool on_source = false, int cutoff = -1);
 
 	/**
 	 * Returns a list of all inflicted/removed conditions.
 	 *
 	 * @return List of all inflicted/removed conditions
 	 */
-	const std::vector<RPG::State>& GetAffectedConditions() const;
+	const std::vector<int16_t>& GetAffectedConditions() const;
 
 	/**
 	 * Returns whether the action hit the target.
@@ -226,7 +265,7 @@ public:
 	virtual bool IsTargetValid() const;
 
 	/**
-	 * Gets the message that is displayed when the action is invoked.
+	 * Gets the first line message that is displayed when the action is invoked.
 	 * Usually of style "[Name] uses/casts [Weapon/Item/Skill]".
 	 *
 	 * @return message
@@ -234,11 +273,38 @@ public:
 	virtual std::string GetStartMessage() const = 0;
 
 	/**
+	 * Checks if there is a first line message to display when the action is invoked.
+	 *
+	 * @return check
+	 */
+	bool HasStartMessage() const;
+
+	/**
+	 * Checks if there is a second line message to display when the action is invoked.
+	 *
+	 * @return check
+	 */
+	virtual bool HasSecondStartMessage() const;
+
+	/**
+	 * Gets the second line message that is displayed when the action is invoked.
+	 * Usually of style "[Name] uses/casts [Weapon/Item/Skill]".
+	 *
+	 * @return message
+	 */
+	virtual std::string GetSecondStartMessage() const;
+
+	/**
 	 * Gets animation state id of the source character.
 	 *
 	 * @return animation state
 	 */
 	virtual int GetSourceAnimationState() const;
+
+	/**
+	* @return true if it is still possible to perform this action now.
+	*/
+	virtual bool ActionIsPossible() const;
 
 	/**
 	 * Gets the sound effect that is played when the action is starting.
@@ -278,7 +344,7 @@ public:
 	 *
 	 * @param out filled with all conditions in text form
 	 */
-	virtual void GetResultMessages(std::vector<std::string>& out) const;
+	virtual void GetResultMessages(std::vector<std::string>& out, std::vector<int>& out_replace) const;
 
 	/**
 	 * Returns the physical rate of the attack.
@@ -299,10 +365,26 @@ public:
 	 */
 	virtual bool IsReflected() const;
 
+	/**
+	 * Returns the algorithm type of this object.
+	 */
+	Type GetType() const;
+
+	/**
+	 * @return The significant restriction of the source when this
+	 *      algorithm was created.
+	 */
+	RPG::State::Restriction GetSourceRestrictionWhenStarted() const;
+
+	/**
+	 * Set number of times to repeat the same action on a target
+	 */
+	void SetRepeat(int repeat);
+
 protected:
-	AlgorithmBase(Game_Battler* source);
-	AlgorithmBase(Game_Battler* source, Game_Battler* target);
-	AlgorithmBase(Game_Battler* source, Game_Party_Base* target);
+	AlgorithmBase(Type t, Game_Battler* source);
+	AlgorithmBase(Type t, Game_Battler* source, Game_Battler* target);
+	AlgorithmBase(Type t, Game_Battler* source, Game_Party_Base* target);
 
 	std::string GetAttackFailureMessage(const std::string& points) const;
 	std::string GetHpSpRecoveredMessage(int value, const std::string& points) const;
@@ -312,9 +394,9 @@ protected:
 	std::string GetDamagedMessage() const;
 	std::string GetParameterChangeMessage(bool is_positive, int value, const std::string& points) const;
 	std::string GetStateMessage(const std::string& message) const;
+	std::string GetAttributeShiftMessage(const std::string& attribute) const;
 
 	void ApplyActionSwitches();
-	float GetAttributeMultiplier(const std::vector<bool>& attributes_set) const;
 
 	void Reset();
 
@@ -328,6 +410,7 @@ protected:
 	 */
 	bool TargetNextInternal() const;
 
+	Type type = Type::Null;
 	Game_Battler* source;
 	std::vector<Game_Battler*> targets;
 	mutable std::vector<Game_Battler*>::iterator current_target;
@@ -348,11 +431,20 @@ protected:
 	bool killed_by_attack_damage;
 	bool critical_hit;
 	bool absorb;
+	bool revived = false;
 	mutable int reflect;
+	RPG::State::Restriction source_restriction = RPG::State::Restriction_normal;
+	int cur_repeat = 0;
+	int repeat = 1;
 
 	RPG::Animation* animation;
+	RPG::Animation* animation2;
+	bool has_animation_played;
+	bool has_animation2_played;
 
-	std::vector<RPG::State> conditions;
+	std::vector<int16_t> conditions;
+	std::vector<int16_t> healed_conditions;
+	std::vector<int16_t> shift_attributes;
 	std::vector<int> switch_on;
 	std::vector<int> switch_off;
 };
@@ -382,11 +474,15 @@ public:
 	void Apply() override;
 
 	std::string GetStartMessage() const override;
+	bool HasSecondStartMessage() const override;
+	std::string GetSecondStartMessage() const override;
 	int GetSourceAnimationState() const override;
 	const RPG::Sound* GetStartSe() const override;
-	void GetResultMessages(std::vector<std::string>& out) const override;
+	const RPG::Sound* GetResultSe() const override;
+	void GetResultMessages(std::vector<std::string>& out, std::vector<int>& out_replace) const override;
 	int GetPhysicalDamageRate() const override;
 	bool IsReflected() const override;
+	bool ActionIsPossible() const override;
 
 private:
 	const RPG::Skill& skill;
@@ -406,19 +502,11 @@ public:
 	std::string GetStartMessage() const override;
 	int GetSourceAnimationState() const override;
 	const RPG::Sound* GetStartSe() const override;
-	void GetResultMessages(std::vector<std::string>& out) const override;
+	void GetResultMessages(std::vector<std::string>& out, std::vector<int>& out_replace) const override;
+	bool ActionIsPossible() const override;
 
 private:
 	const RPG::Item& item;
-};
-
-class NormalDual : public AlgorithmBase {
-public:
-	NormalDual(Game_Battler* source, Game_Battler* target);
-
-	std::string GetStartMessage() const override;
-	const RPG::Sound* GetStartSe() const override;
-	bool Execute() override;
 };
 
 class Defend : public AlgorithmBase {
@@ -469,7 +557,7 @@ public:
 	bool Execute() override;
 	void Apply() override;
 
-	void GetResultMessages(std::vector<std::string>& out) const override;
+	void GetResultMessages(std::vector<std::string>& out, std::vector<int>& out_replace) const override;
 };
 
 class Transform : public AlgorithmBase {
@@ -495,6 +583,15 @@ public:
 	void Apply() override;
 };
 
+
+inline Type AlgorithmBase::GetType() const {
+	return type;
 }
+
+inline bool AlgorithmBase::HasStartMessage() const {
+	return !GetStartMessage().empty();
+}
+
+} //namespace Game_BattleAlgorithm
 
 #endif

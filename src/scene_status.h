@@ -23,7 +23,7 @@
 #include "window_actorinfo.h"
 #include "window_actorstatus.h"
 #include "window_equip.h"
-#include "window_equipstatus.h"
+#include "window_paramstatus.h"
 #include "window_gold.h"
 
 /**
@@ -48,7 +48,7 @@ private:
 	std::unique_ptr<Window_ActorInfo> actorinfo_window;
 	std::unique_ptr<Window_ActorStatus> actorstatus_window;
 	std::unique_ptr<Window_Gold> gold_window;
-	std::unique_ptr<Window_EquipStatus> equipstatus_window;
+	std::unique_ptr<Window_ParamStatus> paramstatus_window;
 	std::unique_ptr<Window_Equip> equip_window;
 };
 

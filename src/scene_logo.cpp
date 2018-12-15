@@ -77,7 +77,7 @@ void Scene_Logo::Update() {
 	++frame_counter;
 
 	if (Player::debug_flag ||
-		frame_counter > 0 || //netherware fix: no show logo
+			frame_counter > 0 || //netherware fix: no show logo
 		Input::IsTriggered(Input::DECISION) ||
 		Input::IsTriggered(Input::CANCEL)) {
 

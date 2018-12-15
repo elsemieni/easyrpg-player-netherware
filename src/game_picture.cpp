@@ -80,17 +80,15 @@ void Game_Picture::UpdateSprite() {
 		sprite->SetBitmap(sheet_bitmap);
 	}
 
-	//netherware fix: patch to allow screen shake
-	//referenced by https://github.com/EasyRPG/Player/pull/1548
 	int x = data.current_x;
 	int y = data.current_y;
 	if (data.flags.affected_by_shake) {
 		x -= Main_Data::game_data.screen.shake_position;
 		y += Main_Data::game_data.screen.shake_position_y;
 	}
+
 	sprite->SetX(x);
 	sprite->SetY(y);
-
 	if (Player::IsMajorUpdatedVersion()) {
 		// Battle Animations are above pictures
 		int priority = Drawable::GetPriorityForMapLayer(data.map_layer);
@@ -114,24 +112,17 @@ void Game_Picture::UpdateSprite() {
 		(int)(255 * (100 - data.current_bot_trans) / 100));
 	if (data.current_bot_trans != data.current_top_trans)
 		sprite->SetBushDepth(sprite->GetHeight() / 2);
-	//netherware fix: patch to allow pic tint
-	//referenced by https://github.com/EasyRPG/Player/pull/1545
-	/*sprite->SetTone(Tone((int) (data.current_red * 128 / 100),
-						 (int) (data.current_green * 128 / 100),
-						 (int) (data.current_blue * 128 / 100),
-						 (int) (data.current_sat * 128 / 100)));*/
+
 	auto tone = Tone((int) (data.current_red * 128 / 100),
-					 (int) (data.current_green * 128 / 100),
-					 (int) (data.current_blue * 128 / 100),
-					 (int) (data.current_sat * 128 / 100));
+			(int) (data.current_green * 128 / 100),
+			(int) (data.current_blue * 128 / 100),
+			(int) (data.current_sat * 128 / 100));
 	if (data.flags.affected_by_tint) {
 		auto screen_tone = Main_Data::game_screen->GetTone();
 		tone = Blend(tone, screen_tone);
 	}
 	sprite->SetTone(tone);
 
-	//netherware fix: add support to screen flash!
-	//referenced by https://github.com/EasyRPG/Player/pull/1549
 	if (data.flags.affected_by_flash) {
 		int flash_level = 0;
 		int flash_time = 0;

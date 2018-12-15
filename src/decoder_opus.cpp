@@ -24,8 +24,6 @@
 #include "audio_decoder.h"
 #include "decoder_opus.h"
 
-#include "output.h"
-
 static int custom_read(void* stream, unsigned char* ptr, int nbytes) {
 	FILE* f = reinterpret_cast<FILE*>(stream);
 	return fread(ptr, 1, nbytes, f);
@@ -112,6 +110,15 @@ bool OpusDecoder::SetFormat(int freq, AudioDecoder::Format format, int chans) {
 		return false;
 
 	return true;
+}
+
+int OpusDecoder::GetTicks() const {
+	if (!oof) {
+		return 0;
+	}
+
+	// According to the docs it is number of samples at 48 kHz
+	return op_pcm_tell(oof) / 48000;
 }
 
 int OpusDecoder::FillBuffer(uint8_t* buffer, int length) {

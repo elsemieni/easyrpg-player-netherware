@@ -34,7 +34,7 @@
 	#include <SDL_system.h>
 #endif
 
-#if defined(GEKKO) || defined(SWITCH) || defined(__MORPHOS__) || defined(__amigaos4__)
+#if defined(GEKKO) || defined(SWITCH) || defined(__MORPHOS__) || defined(__amigaos4__) || defined(__AROS__) 
 	#include <unistd.h>
 #endif
 
@@ -83,7 +83,7 @@ void Main_Data::Init() {
 			// first set to current directory for all platforms
 			project_path = ".";
 
-#if defined(GEKKO) || defined(SWITCH) || defined(__MORPHOS__) || defined(__amigaos4__)
+#if defined(GEKKO) || defined(SWITCH) || defined(__MORPHOS__) || defined(__amigaos4__) || defined(__AROS__) 
 			// Working directory not correctly handled
 			char working_dir[256];
 			getcwd(working_dir, 255);
@@ -145,12 +145,6 @@ void Main_Data::Init() {
 			// Apple Finder does not set the working directory
 			// It points to HOME instead. When it is HOME change it to
 			// the application directory instead
-			
-			//netherware fix: use SDL_GetBasePath for project directory.
-			char* data_dir = SDL_GetBasePath();
-			project_path = data_dir;
-			free(data_dir);
-			
 			/*char* home = getenv("HOME");
 			char current_dir[255] = { 0 };
 			getcwd(current_dir, sizeof(current_dir));
@@ -161,6 +155,10 @@ void Main_Data::Init() {
 
 				free(data_dir);
 			}*/
+			//netherware fix: use SDL_GetBasePath for project directory.
+			char* data_dir = SDL_GetBasePath();
+			project_path = data_dir;
+			free(data_dir);
 #  endif
 #endif
 		}

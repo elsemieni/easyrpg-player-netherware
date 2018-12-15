@@ -28,7 +28,6 @@
 #include <sstream>
 
 #ifdef _WIN32
-#  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 #  include <shlobj.h>
 #  include <sys/types.h>
@@ -292,7 +291,7 @@ std::string FileFinder::MakeCanonical(const std::string& path, int initial_deepn
 			} else {
 				Output::Debug("Path traversal out of game directory: %s", path.c_str());
 			}
-		} else if (path_comp == ".") {
+		} else if (path_comp.empty() || path_comp == ".") {
 			// ignore
 		} else {
 			path_can.push_back(path_comp);
@@ -663,7 +662,7 @@ std::string FileFinder::FindMusic(const std::string& name) {
 
 	//netherware fix: add nsfx as audio format
 	static const char* MUSIC_TYPES[] = {
-		".nsfx", ".opus", ".oga", ".ogg", ".wav", ".mid", ".midi", ".mp3", ".wma", nullptr };
+			".nsfx", ".opus", ".oga", ".ogg", ".wav", ".mid", ".midi", ".mp3", ".wma", nullptr };
 	return FindFile("Music", name, MUSIC_TYPES);
 }
 
@@ -736,7 +735,7 @@ FileFinder::Directory FileFinder::GetDirectoryMembers(const std::string& path, F
 	int dir = opendir(wpath.c_str());
 	if (dir < 0) {
 	#else
-    std::shared_ptr< ::DIR> dir(::opendir(wpath.c_str()), [](::DIR* dir) { if (dir) ::closedir(dir); });
+	std::shared_ptr< ::DIR> dir(::opendir(wpath.c_str()), [](::DIR* d) { if (d) ::closedir(d); });
 	if (!dir) {
 	#endif
 		Output::Debug("Error opening dir %s: %s", path.c_str(),

@@ -175,13 +175,21 @@ WildMidiDecoder::WildMidiDecoder(const std::string file_name) {
 	config_file = "wildmidi.cfg";
 	found = FileFinder::Exists(config_file);
 
+	// wildmidi command line player default config
+	if (!found) {
+		config_file = "/etc/wildmidi/wildmidi.cfg";
+		found = FileFinder::Exists(config_file);
+	}
+
 	// Use Timidity strategy used in SDL mixer
 
 	// Environment variable
-	const char *env = getenv("TIMIDITY_CFG");
-	if (env) {
-		config_file = env;
-		found = FileFinder::Exists(config_file);
+	if (!found) {
+		const char *env = getenv("TIMIDITY_CFG");
+		if (env) {
+			config_file = env;
+			found = FileFinder::Exists(config_file);
+		}
 	}
 
 	if (!found) {
@@ -197,7 +205,8 @@ WildMidiDecoder::WildMidiDecoder(const std::string file_name) {
 	}
 
 	// TODO: We need some installer which creates registry keys for wildmidi
-#	elif defined(__MORPHOS__) || defined(__amigaos4__)
+
+#	elif defined(__MORPHOS__) || defined(__amigaos4__) || defined(__AROS__) 
 	if (!found) {
 		config_file = "timidity/timidity.cfg";
 		found = FileFinder::Exists(config_file);
@@ -246,11 +255,11 @@ WildMidiDecoder::WildMidiDecoder(const std::string file_name) {
 
 	init = (WildMidi_Init(config_file.c_str(), WILDMIDI_FREQ, WILDMIDI_OPTS) == 0);
 	if (!init) {
-		error_message = "Could not initialize libWildMidi";
+		error_message = std::string("WildMidi_Init() failed : ") + WildMidi_GetError();
 		return;
 	}
 
-#if defined(__MORPHOS__) || defined(__amigaos4__)
+#if defined(__MORPHOS__) || defined(__amigaos4__) || defined(__AROS__) 
 	// the default volume is way too quiet with the SDL_mixer patches
 	WildMidi_MasterVolume(127);
 #endif

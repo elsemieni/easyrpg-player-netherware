@@ -35,7 +35,7 @@ public:
 
 	Game_Picture* GetPicture(int id);
 
-	void Reset();
+	void Reset(bool is_load_savegame);
 	void TintScreen(int r, int g, int b, int s, int tenths);
 	void FlashOnce(int r, int g, int b, int s, int tenths);
 	void FlashBegin(int r, int g, int b, int s, int tenths);
@@ -100,7 +100,6 @@ private:
 	RPG::SaveScreen& data;
 	int flash_sat;		// RPGMaker bug: this isn't saved
 	int flash_period;	// RPGMaker bug: this isn't saved
-	//int shake_direction; //netherware fix: referenced by https://github.com/EasyRPG/Player/pull/1548
 
 	std::string movie_filename;
 	int movie_pos_x;

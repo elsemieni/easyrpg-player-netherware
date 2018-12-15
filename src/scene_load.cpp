@@ -41,7 +41,6 @@ void Scene_Load::Action(int index) {
 	Player::LoadSavegame(save_name);
 	Game_Temp::restart_title_cache = true;
 
-	//Scene::PopUntil(Scene::Title); //netherware fix: https://github.com/EasyRPG/Player/pull/1433/
 	Scene::Push(std::make_shared<Scene_Map>(true));
 }
 

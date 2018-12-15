@@ -20,6 +20,7 @@
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
+#include <climits>
 
 #include "async_handler.h"
 #include "system.h"
@@ -44,8 +45,13 @@
 #include "utils.h"
 
 namespace {
+	constexpr int default_pan_x = 9 * SCREEN_TILE_WIDTH;
+	constexpr int default_pan_y = 7 * SCREEN_TILE_WIDTH;
+	constexpr int default_pan_speed = 16;
+
 	RPG::SaveMapInfo& map_info = Main_Data::game_data.map_info;
 	RPG::SavePartyLocation& location = Main_Data::game_data.party_location;
+	RPG::SavePanorama& panorama = Main_Data::game_data.panorama;
 
 	std::string chipset_name;
 	std::string battleback_name;
@@ -68,19 +74,19 @@ namespace {
 
 	std::unique_ptr<BattleAnimation> animation;
 
-	bool pan_locked;
 	bool pan_wait;
-	int pan_speed;
 
 	int last_map_id;
 
 	bool teleport_delay;
 
 	RPG::Chipset* chipset;
+
+	int last_encounter_idx = 0;
 }
 
 void Game_Map::Init() {
-	Dispose();
+	Dispose(false);
 
 	map_info.position_x = 0;
 	map_info.position_y = 0;
@@ -100,55 +106,65 @@ void Game_Map::Init() {
 	for (int i = 0; i < 3; i++)
 		vehicles.push_back(std::make_shared<Game_Vehicle>((Game_Vehicle::Type) (i + 1)));
 
-	pan_locked = false;
 	pan_wait = false;
-	pan_speed = 0;
-	location.pan_finish_x = 0;
-	location.pan_finish_y = 0;
-	location.pan_current_x = 0;
-	location.pan_current_y = 0;
+	location.pan_state = RPG::SavePartyLocation::PanState_follow;
+	location.pan_speed = default_pan_speed;
+	location.pan_finish_x = default_pan_x;
+	location.pan_finish_y = default_pan_y;
+	location.pan_current_x = default_pan_x;
+	location.pan_current_y = default_pan_y;
 	last_map_id = -1;
 
 	teleport_delay = false;
 }
 
-void Game_Map::Dispose() {
+void Game_Map::Dispose(bool is_load_savegame) {
 	events.clear();
 	pending.clear();
 
 	if (Main_Data::game_screen) {
-		Main_Data::game_screen->Reset();
+		Main_Data::game_screen->Reset(is_load_savegame);
 	}
 
 	map.reset();
 	animation.reset();
-	interpreter.reset(new Game_Interpreter_Map(0, true)); //netherware fix for clearing events when load savefile https://github.com/EasyRPG/Player/pull/1566
 }
 
 void Game_Map::Quit() {
-	Dispose();
+	Dispose(false);
 
 	common_events.clear();
 	interpreter.reset();
 }
 
 void Game_Map::Setup(int _id) {
-	//SetupCommon(_id);
-	SetupCommon(_id, false); //netherware fix: https://github.com/EasyRPG/Player/pull/1441
+	SetupCommon(_id, false);
+	map_info.encounter_rate = GetMapInfo().encounter_steps;
+	SetEncounterSteps(0);
+	panorama = {};
 
 	Parallax::ClearChangedBG();
 
 	SetChipset(map->chipset_id);
+
+	for (size_t i = 0; i < map_info.lower_tiles.size(); i++) {
+		map_info.lower_tiles[i] = i;
+	}
+	for (size_t i = 0; i < map_info.upper_tiles.size(); i++) {
+		map_info.upper_tiles[i] = i;
+	}
 
 	events.reserve(map->events.size());
 	for (const RPG::Event& ev : map->events) {
 		events.emplace_back(location.map_id, ev);
 	}
 
-	location.pan_finish_x = 0;
-	location.pan_finish_y = 0;
-	location.pan_current_x = 0;
-	location.pan_current_y = 0;
+	// pan_state does not reset when you change maps.
+	location.pan_speed = default_pan_speed;
+	location.pan_finish_x = default_pan_x;
+	location.pan_finish_y = default_pan_y;
+	location.pan_current_x = default_pan_x;
+	location.pan_current_y = default_pan_y;
 
 	// Save allowed
 	int current_index = GetMapIndex(location.map_id);
@@ -173,8 +189,7 @@ void Game_Map::Setup(int _id) {
 }
 
 void Game_Map::SetupFromSave() {
-	//SetupCommon(location.map_id);
-	SetupCommon(location.map_id, true); //netherware fix: https://github.com/EasyRPG/Player/pull/1441
+	SetupCommon(location.map_id, true);
 
 	// Make main interpreter "busy" if save contained events to prevent auto-events from starting
 	interpreter->SetupFromSave(Main_Data::game_data.events.commands);
@@ -200,19 +215,20 @@ void Game_Map::SetupFromSave() {
 		if (vehicles[i]->IsMoveRouteOverwritten())
 			pending.push_back(vehicles[i].get());
 
-	map_info.Fixup(*map.get());
+	map_info.Fixup(GetMap());
+	map_info.Fixup(GetMapInfo());
 	SetChipset(map_info.chipset_id);
 
-	// FIXME: Handle Pan correctly
-	location.pan_current_x = 0;
-	location.pan_current_y = 0;
-	location.pan_finish_x = 0;
-	location.pan_finish_y = 0;
+	SetEncounterSteps(location.encounter_steps);
 }
 
-//void Game_Map::SetupCommon(int _id) {
-void Game_Map::SetupCommon(int _id, bool is_load_savegame) { //netherware fix: https://github.com/EasyRPG/Player/pull/1441
-	Dispose();
+
+void Game_Map::SetupFromTeleportSelf() {
+	SetEncounterSteps(0);
+}
+
+void Game_Map::SetupCommon(int _id, bool is_load_savegame) {
+	Dispose(is_load_savegame);
 
 	location.map_id = _id;
 
@@ -240,7 +256,6 @@ void Game_Map::SetupCommon(int _id, bool is_load_savegame) { //netherware fix: h
 	refresh_type = Refresh_All;
 
 	int current_index = GetMapIndex(location.map_id);
-	map_info.encounter_rate = Data::treemap.maps[current_index].encounter_steps;
 
 	ss.str("");
 	for (int cur = current_index;
@@ -260,33 +275,28 @@ void Game_Map::SetupCommon(int _id, bool is_load_savegame) { //netherware fix: h
 		pending.push_back(Main_Data::game_player.get());
 
 	pan_wait = false;
-	pan_speed = 0;
 
-	// Make RPG_RT happy
-	// Otherwise current event not resumed after loading
-	// location.map_save_count = map->save_count;
-	//netherware fix: https://github.com/EasyRPG/Player/pull/1441
 	auto map_save_count = map->save_count;
 	if (Player::IsRPG2k3() && map->save_count_2k3e > 0) {
 		map_save_count =  map->save_count_2k3e;
 	}
+
 	//When loading a save game and versions have changed, we need to reset the running events.
 	if (is_load_savegame) {
 		if (location.map_save_count != map_save_count) {
 			Main_Data::game_data.common_events = {};
 			Main_Data::game_data.events = {};
 			Main_Data::game_data.map_info.events = {};
+			Main_Data::game_data.panorama = {};
 		} else if (location.database_save_count != Data::system.save_count) {
 			Main_Data::game_data.common_events = {};
 		}
 	}
+
 	// Update the save counts so that if the player saves the game
 	// events will properly resume upon loading.
 	location.map_save_count = map_save_count;
 	location.database_save_count = Data::system.save_count;
-	//====================================================================
-
-	ResetEncounterSteps();
 }
 
 void Game_Map::PrepareSave() {
@@ -359,14 +369,20 @@ void Game_Map::ScrollRight(int distance) {
 	int x = map_info.position_x;
 	AddScreenX(x, distance);
 	map_info.position_x = x;
-	Parallax::Scroll(distance, 0);
+	// Unused, except compatibility with RPG_RT
+	auto& pan_x = Main_Data::game_data.screen.pan_x;
+	const auto pan_limit_x = 20 * SCREEN_TILE_WIDTH;
+	pan_x = (pan_x - distance + pan_limit_x) % pan_limit_x;
 }
 
 void Game_Map::ScrollDown(int distance) {
 	int y = map_info.position_y;
 	AddScreenY(y, distance);
 	map_info.position_y = y;
-	Parallax::Scroll(0, distance);
+	// Unused, except compatibility with RPG_RT
+	auto& pan_y = Main_Data::game_data.screen.pan_y;
+	const auto pan_limit_y = 10 * SCREEN_TILE_WIDTH;
+	pan_y = (pan_y + distance + pan_limit_y) % pan_limit_y;
 }
 
 // Add inc to acc, clamping the result into the range [low, high].
@@ -501,14 +517,14 @@ static CollisionResult TestCollisionDuringMove(
 	return NoCollision;
 }
 
-bool Game_Map::MakeWay(int x, int y, int d, const Game_Character& self) {
+bool Game_Map::MakeWay(int x, int y, int d, const Game_Character& self, bool force_through) {
 	int new_x = RoundX(x + (d == Game_Character::Right ? 1 : d == Game_Character::Left ? -1 : 0));
 	int new_y = RoundY(y + (d == Game_Character::Down ? 1 : d == Game_Character::Up ? -1 : 0));
 
 	if (!Game_Map::IsValid(new_x, new_y))
 		return false;
 
-	if (self.GetThrough()) return true;
+	if (self.GetThrough() || force_through) return true;
 
 	// A character can move to a position with an impassable tile by
 	// standing on top of an event below it. These flags track whether
@@ -833,7 +849,6 @@ int Game_Map::CheckEvent(int x, int y) {
 
 void Game_Map::Update(bool only_parallel) {
 	if (GetNeedRefresh() != Refresh_None) Refresh();
-	UpdatePan();
 	Parallax::Update();
 	if (animation) {
 		animation->Update();
@@ -858,6 +873,7 @@ void Game_Map::Update(bool only_parallel) {
 	}
 
 	Main_Data::game_player->Update();
+	UpdatePan();
 	GetInterpreter().Update();
 
 	for (Game_Event& ev : events) {
@@ -872,6 +888,11 @@ void Game_Map::Update(bool only_parallel) {
 		vehicles[i]->Update();
 
 	free_interpreters.clear();
+}
+
+RPG::MapInfo const& Game_Map::GetMapInfo() {
+	auto idx = GetMapIndex(location.map_id);
+	return Data::treemap.maps[idx];
 }
 
 RPG::Map const& Game_Map::GetMap() {
@@ -916,6 +937,11 @@ void Game_Map::UpdateEncounterSteps() {
 		return;
 	}
 
+	if (GetEncounterRate() <= 0) {
+		location.encounter_steps = 0;
+		return;
+	}
+
 	int x = Main_Data::game_player->GetX();
 	int y = Main_Data::game_player->GetY();
 
@@ -925,23 +951,58 @@ void Game_Map::UpdateEncounterSteps() {
 		return;
 	}
 
-	location.encounter_steps = location.encounter_steps - terrain->encounter_rate;
+	location.encounter_steps += terrain->encounter_rate;
 
-	if (location.encounter_steps <= 0) {
-		ResetEncounterSteps();
+	struct Row {
+		int ratio;
+		float pmod;
+	};
+
+#if 1
+	static constexpr Row enc_table[] = {
+		{ 0, 0.0625},
+		{ 20, 0.125 },
+		{ 40, 0.25 },
+		{ 60, 0.5 },
+		{ 100, 2.0 },
+		{ 140, 4.0 },
+		{ 160, 8.0 },
+		{ 180, 16.0 },
+		{ INT_MAX, 16.0 }
+	};
+#else
+	//Old versions of RM2k used this table.
+	//Left here for posterity.
+	static constexpr Row enc_table[] = {
+		{ 0, 0.5 },
+		{ 20, 2.0 / 3.0 },
+		{ 50, 5.0 / 6.0 },
+		{ 100, 6.0 / 5.0 },
+		{ 200, 3.0 / 2.0 },
+		{ INT_MAX, 3.0 / 2.0 }
+	};
+#endif
+	const auto encounter_rate = GetEncounterRate();
+	const auto ratio = location.encounter_steps / encounter_rate;
+
+	auto& idx = last_encounter_idx;
+	while (ratio > enc_table[idx+1].ratio) {
+		++idx;
+	}
+	const auto& row = enc_table[idx];
+
+	const auto pmod = row.pmod;
+	const auto p = (1.0f / float(encounter_rate)) * pmod * (float(terrain->encounter_rate) / 100.0f);
+
+	if (Utils::PercentChance(p)) {
+		SetEncounterSteps(0);
 		PrepareEncounter();
 	}
 }
 
-void Game_Map::ResetEncounterSteps() {
-	int rate = GetEncounterRate();
-	if (rate > 0) {
-		int throw_one = Utils::GetRandomNumber(0, rate - 1);
-		int throw_two = Utils::GetRandomNumber(0, rate - 1);
-
-		// *100 to handle terrain rate better
-		location.encounter_steps = (throw_one + throw_two + 1) * 100;
-	}
+void Game_Map::SetEncounterSteps(int steps) {
+	last_encounter_idx = 0;
+	location.encounter_steps = steps;
 }
 
 std::vector<int> Game_Map::GetEncountersAt(int x, int y) {
@@ -1007,6 +1068,10 @@ bool Game_Map::PrepareEncounter() {
 
 	Game_Temp::battle_troop_id = encounters[Utils::GetRandomNumber(0, encounters.size() - 1)];
 	Game_Temp::battle_calling = true;
+
+	if (Utils::GetRandomNumber(1, 32) == 1) {
+		Game_Temp::battle_first_strike = true;
+	}
 
 	SetupBattle();
 
@@ -1093,8 +1158,14 @@ int Game_Map::GetDisplayX() {
 	return map_info.position_x + shake_in_pixels * 16;
 }
 
-void Game_Map::SetPositionX(int new_position_x) {
-	map_info.position_x = new_position_x;
+void Game_Map::SetPositionX(int x) {
+	const int map_width = GetWidth() * SCREEN_TILE_WIDTH;
+	if (LoopHorizontal()) {
+		x = Utils::PositiveModulo(x, map_width);
+	} else {
+		x = std::max(0, std::min(map_width - SCREEN_WIDTH, x));
+	}
+	map_info.position_x = x;
 }
 
 int Game_Map::GetPositionY() {
@@ -1105,8 +1176,14 @@ int Game_Map::GetDisplayY() {
 	return map_info.position_y;
 }
 
-void Game_Map::SetPositionY(int new_position_y) {
-	map_info.position_y = new_position_y;
+void Game_Map::SetPositionY(int y) {
+	const int map_height = GetHeight() * SCREEN_TILE_WIDTH;
+	if (LoopVertical()) {
+		y = Utils::PositiveModulo(y, map_height);
+	} else {
+		y = std::max(0, std::min(map_height - SCREEN_HEIGHT, y));
+	}
+	map_info.position_y = y;
 }
 
 Game_Map::RefreshMode Game_Map::GetNeedRefresh() {
@@ -1202,10 +1279,6 @@ void Game_Map::SetChipset(int id) {
 		passages_down.resize(162, (unsigned char) 0x0F);
 	if (passages_up.size() < 144)
 		passages_up.resize(144, (unsigned char) 0x0F);
-	for (uint8_t i = 0; i < 144; i++) {
-		map_info.lower_tiles[i] = i;
-		map_info.upper_tiles[i] = i;
-	}
 }
 
 Game_Vehicle* Game_Map::GetVehicle(Game_Vehicle::Type which) {
@@ -1225,7 +1298,7 @@ bool Game_Map::IsAnyEventStarting() {
 
 	for (Game_CommonEvent& ev : common_events)
 		if ((ev.GetTrigger() == RPG::EventPage::Trigger_auto_start) &&
-			(ev.GetSwitchFlag() ? Game_Switches[ev.GetSwitchId()] : true) &&
+			(ev.GetSwitchFlag() ? Game_Switches.Get(ev.GetSwitchId()) : true) &&
 			(!ev.GetList().empty()))
 				return true;
 
@@ -1257,55 +1330,58 @@ void Game_Map::RemoveAllPendingMoves() {
 	pending.clear();
 }
 
-void Game_Map::SubstituteDown(int old_id, int new_id) {
-	for (size_t i = 0; i < map_info.lower_tiles.size(); ++i) {
-		if (map_info.lower_tiles[i] == old_id) {
-			map_info.lower_tiles[i] = (uint8_t) new_id;
+static int DoSubstitute(std::vector<uint8_t>& tiles, int old_id, int new_id) {
+	int num_subst = 0;
+	for (size_t i = 0; i < tiles.size(); ++i) {
+		if (tiles[i] == old_id) {
+			tiles[i] = (uint8_t) new_id;
+			++num_subst;
 		}
 	}
+	return num_subst;
 }
 
-void Game_Map::SubstituteUp(int old_id, int new_id) {
-	for (size_t i = 0; i < map_info.upper_tiles.size(); ++i) {
-		if (map_info.upper_tiles[i] == old_id) {
-			map_info.upper_tiles[i] = (uint8_t) new_id;
-		}
-	}
+int Game_Map::SubstituteDown(int old_id, int new_id) {
+	return DoSubstitute(map_info.lower_tiles, old_id, new_id);
+}
+
+int Game_Map::SubstituteUp(int old_id, int new_id) {
+	return DoSubstitute(map_info.upper_tiles, old_id, new_id);
 }
 
 void Game_Map::LockPan() {
-	pan_locked = true;
+	location.pan_state = RPG::SavePartyLocation::PanState_fixed;
 }
 
 void Game_Map::UnlockPan() {
-	pan_locked = false;
+	location.pan_state = RPG::SavePartyLocation::PanState_follow;
 }
 
 void Game_Map::StartPan(int direction, int distance, int speed, bool wait) {
 	distance *= SCREEN_TILE_WIDTH;
 
 	if (direction == PanUp) {
-		int new_pan = location.pan_finish_y - distance;
-		location.pan_finish_y = new_pan;
-	} else if (direction == PanRight) {
-		int new_pan = location.pan_finish_x + distance;
-		location.pan_finish_x = new_pan;
-	} else if (direction == PanDown) {
 		int new_pan = location.pan_finish_y + distance;
 		location.pan_finish_y = new_pan;
-	} else if (direction == PanLeft) {
+	} else if (direction == PanRight) {
 		int new_pan = location.pan_finish_x - distance;
+		location.pan_finish_x = new_pan;
+	} else if (direction == PanDown) {
+		int new_pan = location.pan_finish_y - distance;
+		location.pan_finish_y = new_pan;
+	} else if (direction == PanLeft) {
+		int new_pan = location.pan_finish_x + distance;
 		location.pan_finish_x = new_pan;
 	}
 
-	pan_speed = speed;
+	location.pan_speed = 2 << speed;
 	pan_wait = wait;
 }
 
 void Game_Map::ResetPan(int speed, bool wait) {
-	location.pan_finish_x = 0;
-	location.pan_finish_y = 0;
-	pan_speed = speed;
+	location.pan_finish_x = default_pan_x;
+	location.pan_finish_y = default_pan_y;
+	location.pan_speed = 2 << speed;
 	pan_wait = wait;
 }
 
@@ -1313,25 +1389,33 @@ void Game_Map::UpdatePan() {
 	if (!IsPanActive())
 		return;
 
-	int step = (SCREEN_TILE_WIDTH/128) << pan_speed;
-	int dx = location.pan_finish_x - location.pan_current_x;
-	int dy = location.pan_finish_y - location.pan_current_y;
+	const int step = location.pan_speed;
+	const int pan_remain_x = location.pan_current_x - location.pan_finish_x;
+	const int pan_remain_y = location.pan_current_y - location.pan_finish_y;
 
-	if (dx > 0) {
-		int pan = location.pan_current_x + std::min(step, dx);
-		location.pan_current_x = pan;
-	} else if (dx < 0) {
-		int pan = location.pan_current_x - std::min(step, -dx);
-		location.pan_current_x = pan;
+	int dx = std::min(step, std::abs(pan_remain_x));
+	dx = pan_remain_x >= 0 ? dx : -dx;
+	int dy = std::min(step, std::abs(pan_remain_y));
+	dy = pan_remain_y >= 0 ? dy : -dy;
+
+	int screen_x = Game_Map::GetPositionX();
+	int screen_y = Game_Map::GetPositionY();
+
+	Game_Map::AddScreenX(screen_x, dx);
+	Game_Map::AddScreenY(screen_y, dy);
+
+	// If we hit the edge of the map before pan finishes, the
+	// pan converts from waiting to non-waiting.
+	if (dx == 0 && dy == 0) {
+		pan_wait = false;
+		return;
 	}
 
-	if (dy > 0) {
-		int pan = location.pan_current_y + std::min(step, dy);
-		location.pan_current_y = pan;
-	} else if (dy < 0) {
-		int pan = location.pan_current_y - std::min(step, -dy);
-		location.pan_current_y = pan;
-	}
+	Game_Map::ScrollRight(dx);
+	Game_Map::ScrollDown(dy);
+
+	location.pan_current_x -= dx;
+	location.pan_current_y -= dy;
 }
 
 bool Game_Map::IsPanActive() {
@@ -1343,7 +1427,7 @@ bool Game_Map::IsPanWaiting() {
 }
 
 bool Game_Map::IsPanLocked() {
-	return pan_locked;
+	return location.pan_state == RPG::SavePartyLocation::PanState_fixed;
 }
 
 int Game_Map::GetPanX() {
@@ -1423,38 +1507,47 @@ std::string Game_Map::Parallax::GetName() {
 }
 
 int Game_Map::Parallax::GetX() {
-	return parallax_x / TILE_SIZE;
+	return (parallax_x - panorama.pan_x / 2) / TILE_SIZE;
 }
 
 int Game_Map::Parallax::GetY() {
-	return parallax_y / TILE_SIZE;
+	return (parallax_y - panorama.pan_y / 2) / TILE_SIZE;
 }
 
 void Game_Map::Parallax::Initialize(int width, int height) {
 	parallax_width = width;
 	parallax_height = height;
 
-	ResetPosition();
+	UpdatePosition(true);
 }
 
-void Game_Map::Parallax::ResetPosition() {
+void Game_Map::Parallax::UpdatePosition(bool init) {
 	Params params = GetParallaxParams();
 
-	if (params.scroll_horz)
-		parallax_x = -map_info.position_x / 2;
-	else if (GetWidth() > 20 && parallax_width > SCREEN_TARGET_WIDTH)
-		parallax_x = -std::min(map_info.position_x,
-			(map_info.position_x / (SCREEN_TILE_WIDTH / TILE_SIZE)) * (parallax_width - SCREEN_TARGET_WIDTH) / (GetWidth() - 20));
-	else
-		parallax_x = 0;
+	// RPG_RT bug:
+	// On loaded save games, RPG_RT will always reset
+	// parallax_x/y to 0 when the map is looping.
+	// We don't emulate this.
 
-	if (params.scroll_vert)
-		parallax_y = -map_info.position_y / 2;
-	else if (GetHeight() > 15 && parallax_height > SCREEN_TARGET_HEIGHT)
-		parallax_y = -std::min(map_info.position_y,
-			(map_info.position_y / (SCREEN_TILE_WIDTH / TILE_SIZE)) * (parallax_height - SCREEN_TARGET_HEIGHT) / (GetHeight() - 15));
-	else
-		parallax_y = 0;
+	if (init || !Game_Map::LoopHorizontal()) {
+		if (params.scroll_horz || LoopHorizontal())
+			parallax_x = -map_info.position_x / 2;
+		else if (GetWidth() > 20 && parallax_width > SCREEN_TARGET_WIDTH)
+			parallax_x = -std::min(map_info.position_x,
+					(map_info.position_x / (SCREEN_TILE_WIDTH / TILE_SIZE)) * (parallax_width - SCREEN_TARGET_WIDTH) / (GetWidth() - 20));
+		else
+			parallax_x = 0;
+	}
+
+	if (init || !Game_Map::LoopVertical()) {
+		if (params.scroll_vert || Game_Map::LoopVertical())
+			parallax_y = -map_info.position_y / 2;
+		else if (GetHeight() > 15 && parallax_height > SCREEN_TARGET_HEIGHT)
+			parallax_y = -std::min(map_info.position_y,
+					(map_info.position_y / (SCREEN_TILE_WIDTH / TILE_SIZE)) * (parallax_height - SCREEN_TARGET_HEIGHT) / (GetHeight() - 15));
+		else
+			parallax_y = 0;
+	}
 }
 
 void Game_Map::Parallax::Update() {
@@ -1463,54 +1556,24 @@ void Game_Map::Parallax::Update() {
 	if (params.name.empty())
 		return;
 
+	UpdatePosition();
+
 	auto scroll_amt = [](int speed) {
 		if (speed > 0) return 1 << (speed - 1);
 		if (speed < 0) return -(1 << (-speed - 1));
 		return 0;
 	};
 
+
 	if (params.scroll_horz && params.scroll_horz_auto) {
-		parallax_x += scroll_amt(params.scroll_horz_speed);
+		const auto w = parallax_width * TILE_SIZE * 2;
+		panorama.pan_x -= scroll_amt(params.scroll_horz_speed) * 2;
+		panorama.pan_x = (panorama.pan_x + w) % w;
 	}
 	if (params.scroll_vert && params.scroll_vert_auto) {
-		parallax_y += scroll_amt(params.scroll_vert_speed);
-	}
-}
-
-/** Return the argument that is closer to zero. */
-static int closer_to_zero(int x, int y) {
-	return (std::abs(x) < std::abs(y)) ? x : y;
-}
-
-void Game_Map::Parallax::Scroll(int distance_right, int distance_down) {
-	Params params = GetParallaxParams();
-
-	// TODO: understand and then doc this function :)
-
-	if (params.scroll_vert) {
-		parallax_y -= distance_down / 2;
-	} else if (
-		!LoopVertical() &&
-		GetHeight() > 15 && parallax_height > SCREEN_TARGET_HEIGHT
-	) {
-		parallax_y -=
-			closer_to_zero(
-				distance_down,
-				distance_down * (parallax_height - SCREEN_TARGET_HEIGHT) / (GetHeight() - 15) / (SCREEN_TILE_WIDTH / TILE_SIZE)
-			);
-	}
-
-	if (params.scroll_horz) {
-		parallax_x -= distance_right / 2;
-	} else if (
-		!LoopHorizontal() &&
-		GetWidth() > 20 && parallax_width > SCREEN_TARGET_WIDTH
-	) {
-		parallax_x -=
-			closer_to_zero(
-				distance_right,
-				distance_right * (parallax_width - SCREEN_TARGET_WIDTH) / (GetWidth() - 20) / (SCREEN_TILE_WIDTH / TILE_SIZE)
-			);
+		const auto h = parallax_height * TILE_SIZE * 2;
+		panorama.pan_y -= scroll_amt(params.scroll_vert_speed) * 2;
+		panorama.pan_y = (panorama.pan_y + h) % h;
 	}
 }
 
@@ -1522,6 +1585,7 @@ void Game_Map::Parallax::ChangeBG(const Params& params) {
 	map_info.parallax_vert = params.scroll_vert;
 	map_info.parallax_vert_auto = params.scroll_vert_auto;
 	map_info.parallax_vert_speed = params.scroll_vert_speed;
+	panorama = {};
 }
 
 void Game_Map::Parallax::ClearChangedBG() {

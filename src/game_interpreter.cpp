@@ -51,16 +51,12 @@
 #include "utils.h"
 #include "transition.h"
 
+//netherware fix: steamshim
 #ifdef STEAMSHIM
 #   include "../steamshim/steamshim_child.h"
 #endif
 
 namespace {
-	constexpr int max_var_size_2k3 = 9999999;
-	constexpr int min_var_size_2k3 = -max_var_size_2k3;
-	constexpr int max_var_size_2k = 999999;
-	constexpr int min_var_size_2k = -max_var_size_2k;
-
 	// Used to ensure that the interpreter that runs after a Erase/ShowScreen
 	// is the invoker of the transition
 	static Game_Interpreter* transition_owner = nullptr;
@@ -178,6 +174,9 @@ void Game_Interpreter::Update() {
 
 		if (main_flag) {
 			if (Main_Data::game_player->IsBoardingOrUnboarding())
+				break;
+
+			if (Main_Data::game_player->InVehicle() && Main_Data::game_player->GetVehicle()->IsAscendingOrDescending())
 				break;
 
 			if (Game_Message::message_waiting)
@@ -557,6 +556,8 @@ bool Game_Interpreter::CommandEnd() { // code 10
 			evnt->StopTalkToHero();
 	}
 
+	Scene::instance->onCommandEnd();
+
 	return true;
 }
 
@@ -728,14 +729,14 @@ bool Game_Interpreter::CommandControlSwitches(RPG::EventCommand const& com) { //
 		// Param0: 0: Single, 1: Range, 2: Indirect
 		// For Range set end to param 2, otherwise to start, this way the loop runs exactly once
 
-		int start = com.parameters[0] == 2 ? Game_Variables[com.parameters[1]] : com.parameters[1];
+		int start = com.parameters[0] == 2 ? Game_Variables.Get(com.parameters[1]) : com.parameters[1];
 		int end = com.parameters[0] == 1 ? com.parameters[2] : start;
 
 		for (int i = start; i <= end; ++i) {
 			if (com.parameters[3] != 2) {
-				Game_Switches[i] = com.parameters[3] == 0;
+				Game_Switches.Set(i, com.parameters[3] == 0);
 			} else {
-				Game_Switches[i] = !Game_Switches[i];
+				Game_Switches.Flip(i);
 			}
 		}
 
@@ -758,11 +759,11 @@ bool Game_Interpreter::CommandControlVariables(RPG::EventCommand const& com) { /
 			break;
 		case 1:
 			// Var A ops B
-			value = Game_Variables[com.parameters[5]];
+			value = Game_Variables.Get(com.parameters[5]);
 			break;
 		case 2:
 			// Number of var A ops B
-			value = Game_Variables[Game_Variables[com.parameters[5]]];
+			value = Game_Variables.Get(Game_Variables.Get(com.parameters[5]));
 			break;
 		case 3:
 			// Random between range
@@ -982,49 +983,40 @@ bool Game_Interpreter::CommandControlVariables(RPG::EventCommand const& com) { /
 		// Param0: 0: Single, 1: Range, 2: Indirect
 		// For Range set end to param 2, otherwise to start, this way the loop runs exactly once
 
-		int start = com.parameters[0] == 2 ? Game_Variables[com.parameters[1]] : com.parameters[1];
+		int start = com.parameters[0] == 2 ? Game_Variables.Get(com.parameters[1]) : com.parameters[1];
 		int end = com.parameters[0] == 1 ? com.parameters[2] : start;
 
 		for (i = start; i <= end; ++i) {
 			switch (com.parameters[3]) {
 				case 0:
 					// Assignement
-					Game_Variables[i] = value;
+					Game_Variables.Set(i, value);
 					break;
 				case 1:
 					// Addition
-					Game_Variables[i] += value;
+					Game_Variables.Set(i, Game_Variables.Get(i) + value);
 					break;
 				case 2:
 					// Subtraction
-					Game_Variables[i] -= value;
+					Game_Variables.Set(i, Game_Variables.Get(i) - value);
 					break;
 				case 3:
 					// Multiplication
-					Game_Variables[i] *= value;
+					Game_Variables.Set(i, Game_Variables.Get(i) * value);
 					break;
 				case 4:
 					// Division
 					if (value != 0) {
-						Game_Variables[i] /= value;
+						Game_Variables.Set(i, Game_Variables.Get(i) / value);
 					}
 					break;
 				case 5:
 					// Module
 					if (value != 0) {
-						Game_Variables[i] %= value;
+						Game_Variables.Set(i, Game_Variables.Get(i) % value);
 					} else {
-						Game_Variables[i] = 0;
+						Game_Variables.Set(i, 0);
 					}
-			}
-
-			// Clamp to variable range
-			if (Player::IsRPG2k3()) {
-				Game_Variables[i] = std::max(
-						std::min(Game_Variables[i], max_var_size_2k3), min_var_size_2k3);
-			} else {
-				Game_Variables[i] = std::max(
-						std::min(Game_Variables[i], max_var_size_2k), min_var_size_2k);
 			}
 		}
 
@@ -1040,7 +1032,7 @@ int Game_Interpreter::OperateValue(int operation, int operand_type, int operand)
 	if (operand_type == 0) {
 		value = operand;
 	} else {
-		value = Game_Variables[operand];
+		value = Game_Variables.Get(operand);
 	}
 
 	// Reverse sign of value if operation is substract
@@ -1073,9 +1065,9 @@ std::vector<Game_Actor*> Game_Interpreter::GetActors(int mode, int id) {
 		break;
 	case 2:
 		// Var hero
-		actor = Game_Actors::GetActor(Game_Variables[id]);
+		actor = Game_Actors::GetActor(Game_Variables.Get(id));
 		if (!actor) {
-			Output::Warning("Invalid actor ID %d", Game_Variables[id]);
+			Output::Warning("Invalid actor ID %d", Game_Variables.Get(id));
 			return actors;
 		}
 
@@ -1170,7 +1162,7 @@ bool Game_Interpreter::CommandChangeItems(RPG::EventCommand const& com) { // Cod
 	} else {
 		// Item by variable
 		Main_Data::game_party->AddItem(
-			Game_Variables[com.parameters[2]],
+			Game_Variables.Get(com.parameters[2]),
 			value
 		);
 	}
@@ -1186,7 +1178,7 @@ bool Game_Interpreter::CommandChangePartyMember(RPG::EventCommand const& com) { 
 	if (com.parameters[1] == 0) {
 		id = com.parameters[2];
 	} else {
-		id = Game_Variables[com.parameters[2]];
+		id = Game_Variables.Get(com.parameters[2]);
 	}
 
 	actor = Game_Actors::GetActor(id);
@@ -1246,7 +1238,7 @@ int Game_Interpreter::ValueOrVariable(int mode, int val) {
 		case 0:
 			return val;
 		case 1:
-			return Game_Variables[val];
+			return Game_Variables.Get(val);
 		default:
 			return -1;
 	}
@@ -1353,12 +1345,13 @@ bool Game_Interpreter::CommandChangeEquipment(RPG::EventCommand const& com) { //
 				Main_Data::game_party->AddItem(item_id, 1);
 			}
 
-			if (actor->HasTwoWeapons() && slot == RPG::Item::Type_weapon) {
+			if (actor->HasTwoWeapons() && slot == RPG::Item::Type_weapon && item_id != 0) {
 				RPG::Item* new_equipment = ReaderUtil::GetElement(Data::items, item_id);
 				RPG::Item* equipment1 = ReaderUtil::GetElement(Data::items, actor->GetWeaponId());
 				RPG::Item* equipment2 = ReaderUtil::GetElement(Data::items, actor->GetShieldId());
 
 				if (equipment1 && !equipment2 && !equipment1->two_handed && !new_equipment->two_handed) {
+					// Assign to 2nd weapon slot when empty
 					actor->ChangeEquipment(slot + 1, item_id);
 					continue;
 				}
@@ -1381,11 +1374,13 @@ bool Game_Interpreter::CommandChangeHP(RPG::EventCommand const& com) { // Code 1
 		amount = -amount;
 
 	for (const auto& actor : GetActors(com.parameters[0], com.parameters[1])) {
-		int hp = actor->GetHp() + amount;
-		if (!lethal && hp <= 0) {
-			amount += hp * (-1) + 1;
+		int hp = actor->GetHp();
+
+		if (!lethal && hp + amount <= 0) {
+			actor->ChangeHp(-hp + 1);
+		} else {
+			actor->ChangeHp(amount);
 		}
-		actor->ChangeHp(amount);
 
 		if (actor->IsDead()) {
 			Game_Battle::SetNeedRefresh(true);
@@ -1425,9 +1420,6 @@ bool Game_Interpreter::CommandChangeCondition(RPG::EventCommand const& com) { //
 			actor->RemoveState(state_id);
 			Game_Battle::SetNeedRefresh(true);
 		} else {
-			if(state_id == 1) {
-				actor->ChangeHp(-actor->GetHp());
-			}
 			actor->AddState(state_id);
 			Game_Battle::SetNeedRefresh(true);
 			CheckGameOver();
@@ -1439,9 +1431,9 @@ bool Game_Interpreter::CommandChangeCondition(RPG::EventCommand const& com) { //
 
 bool Game_Interpreter::CommandFullHeal(RPG::EventCommand const& com) { // Code 10490
 	for (const auto& actor : GetActors(com.parameters[0], com.parameters[1])) {
+		actor->RemoveAllStates();
 		actor->ChangeHp(actor->GetMaxHp());
 		actor->SetSp(actor->GetMaxSp());
-		actor->RemoveAllStates();
 	}
 
 	Game_Battle::SetNeedRefresh(true);
@@ -1472,7 +1464,7 @@ bool Game_Interpreter::CommandSimulatedAttack(RPG::EventCommand const& com) { //
 		CheckGameOver();
 
 		if (com.parameters[6] != 0) {
-			Game_Variables[com.parameters[7]] = result;
+			Game_Variables.Set(com.parameters[7], result);
 			Game_Map::SetNeedRefresh(Game_Map::Refresh_Map);
 		}
 	}
@@ -1526,15 +1518,16 @@ bool Game_Interpreter::CommandPlaySound(RPG::EventCommand const& com) { // code 
 	return true;
 }
 
+//netherware fix: practicamente toda la funcion
 bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com */) { // code 12310
 
 #ifdef STEAMSHIM
-	if ( Game_Variables.IsValid(2501) && Game_Variables.IsValid(2503) ) {
+    if ( Game_Variables.IsValid(2501) && Game_Variables.IsValid(2503) ) {
 
 		const STEAMSHIM_Event *e;
 		std::string variableName;
 
-		switch (Game_Variables[2501]) {
+		switch (Game_Variables.Get(2501)) {
 			case -101100:
 				//request stats
 				STEAMSHIM_requestStats();
@@ -1547,89 +1540,89 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
 					//event received
 					switch (e->type) {
 						case SHIMEVENT_STATSRECEIVED:
-							Game_Variables[2501] = 1;
+							Game_Variables.Set(2501, 1);
 							break;
 						case SHIMEVENT_STATSSTORED:
-							Game_Variables[2501] = 2;
+							Game_Variables.Set(2501, 2);
 							break;
 						case SHIMEVENT_SETACHIEVEMENT:
-							Game_Variables[2501] = 3;
+							Game_Variables.Set(2501, 3);
 							break;
 						case SHIMEVENT_GETACHIEVEMENT:
-							Game_Variables[2501] = 4;
+							Game_Variables.Set(2501, 4);
 							break;
 						case SHIMEVENT_RESETSTATS:
-							Game_Variables[2501] = 5;
+							Game_Variables.Set(2501, 5);
 							break;
 						case SHIMEVENT_SETSTATI:
-							Game_Variables[2501] = 6;
+							Game_Variables.Set(2501, 6);
 							break;
 						case SHIMEVENT_GETSTATI:
-							Game_Variables[2501] = 7;
-							Game_Variables[2502] = e->ivalue;
+							Game_Variables.Set(2501, 7);
+							Game_Variables.Set(2502, e->ivalue);
 							break;
 					    case SHIMEVENT_LEADERBOARDFINDRESULT:
-					        Game_Variables[2501] = 8;
-					        Game_Variables[2502] = e->ivalue;
+					        Game_Variables.Set(2501, 8);
+					        Game_Variables.Set(2502, e->ivalue);
 						default:
-							Game_Variables[2501] = -1;
+							Game_Variables.Set(2501, -1);
 							break;
 					}
 				} else {
 					//No event this time
-					Game_Variables[2501] = 0;
+					Game_Variables.Set(2501, 0);
 				}
 				return true;;
 				break;
 			case -101102:
 				//get stat
-				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables[2502]);
+				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables.Get(2502));
 				STEAMSHIM_getStatI(variableName.c_str());
-				Game_Variables[2501] = 0;
+				Game_Variables.Set(2501, 0);
 				return true;
 				break;
 			case -101103:
 				//get archivement
-				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables[2502]);
+				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables.Get(2502));
 				STEAMSHIM_getAchievement(variableName.c_str());
-				Game_Variables[2501] = 0;
+				Game_Variables.Set(2501, 0);
 				return true;
 				break;
 			case -101104:
 				//set statI
-				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables[2502]);
-				STEAMSHIM_setStatI(variableName.c_str(), Game_Variables[2503]);
+				variableName = "RM_STEAM_STAT" + std::to_string(Game_Variables.Get(2502));
+				STEAMSHIM_setStatI(variableName.c_str(), Game_Variables.Get(2503));
 				STEAMSHIM_storeStats();
-				Game_Variables[2501] = 0;
+				Game_Variables.Set(2501, 0);
 				return true;
 				break;
 			case -101105:
 				//set archivement
-				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables[2502]);
+				variableName = "RM_STEAM_ARCHIV" + std::to_string(Game_Variables.Get(2502));
 				STEAMSHIM_setAchievement(variableName.c_str(), 1);
 				STEAMSHIM_storeStats();
-				Game_Variables[2501] = 0;
+				Game_Variables.Set(2501, 0);
 				return true;
 				break;
 			case -101106:
 				//reset
 				STEAMSHIM_resetStats(1);
     			STEAMSHIM_storeStats();
-    			Game_Variables[2501] = 0;
+    			Game_Variables.Set(2501, 0);
     			return true;
     			break;
     		case -101107:
 				//get scoreboard id
-				variableName = "SCOREBOARD_" + std::to_string(Game_Variables[2502]);
+				variableName = "SCOREBOARD_" + std::to_string(Game_Variables.Get(2502));
 				STEAMSHIM_findLeaderboard(variableName.c_str());
-    			Game_Variables[2501] = 0;
+    			Game_Variables.Set(2501, 0);
     			return true;
     			break;
     		case -101108:
 				//set value to scoreboard
-				STEAMSHIM_uploadLeaderboardScore(Game_Variables[2502], Game_Variables[2503]);
+				STEAMSHIM_uploadLeaderboardScore(Game_Variables.Get(2502), Game_Variables.Get(2503));
 				STEAMSHIM_storeStats();
-    			Game_Variables[2501] = 0;
+    			Game_Variables.Set(2501, 0);
     			return true;
     			break;
 			default:
@@ -1639,13 +1632,13 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
 	}
 
 #else
-	//netherware fix: if it's a standalone build and if I try to call steamshim function, do nothing.
-	if (!Game_Variables.IsValid(2501) || Game_Variables[2501] == 0 ) {
-		index = list.size();
-	}
+    //netherware fix: if it's a standalone build and if I try to call steamshim function, do nothing.
+    if (!Game_Variables.IsValid(2501) || Game_Variables.Get(2501) == 0 ) {
+        index = list.size();
+    }
 #endif
 
-	return true;
+    return true;
 
 }
 
@@ -1780,9 +1773,9 @@ bool Game_Interpreter::CommandMemorizeLocation(RPG::EventCommand const& com) { /
 	int var_map_id = com.parameters[0];
 	int var_x = com.parameters[1];
 	int var_y = com.parameters[2];
-	Game_Variables[var_map_id] = Game_Map::GetMapId();
-	Game_Variables[var_x] = player->GetX();
-	Game_Variables[var_y] = player->GetY();
+	Game_Variables.Set(var_map_id, Game_Map::GetMapId());
+	Game_Variables.Set(var_x, player->GetX());
+	Game_Variables.Set(var_y, player->GetY());
 	Game_Map::SetNeedRefresh(Game_Map::Refresh_Map);
 	return true;
 }
@@ -1894,7 +1887,7 @@ bool Game_Interpreter::CommandStoreTerrainID(RPG::EventCommand const& com) { // 
 	int x = ValueOrVariable(com.parameters[0], com.parameters[1]);
 	int y = ValueOrVariable(com.parameters[0], com.parameters[2]);
 	int var_id = com.parameters[3];
-	Game_Variables[var_id] = Game_Map::GetTerrainTag(x, y);
+	Game_Variables.Set(var_id, Game_Map::GetTerrainTag(x, y));
 	Game_Map::SetNeedRefresh(Game_Map::Refresh_Map);
 	return true;
 }
@@ -1905,7 +1898,7 @@ bool Game_Interpreter::CommandStoreEventID(RPG::EventCommand const& com) { // co
 	int var_id = com.parameters[3];
 	std::vector<Game_Event*> events;
 	Game_Map::GetEventsXY(events, x, y);
-	Game_Variables[var_id] = events.size() > 0 ? events.back()->GetId() : 0;
+	Game_Variables.Set(var_id, events.size() > 0 ? events.back()->GetId() : 0);
 	Game_Map::SetNeedRefresh(Game_Map::Refresh_Map);
 	return true;
 }
@@ -2176,9 +2169,9 @@ namespace PicPointerPatch {
 		if (pic_id > 10000) {
 			int new_id;
 			if (pic_id > 50000) {
-				new_id = Game_Variables[pic_id - 50000];
+				new_id = Game_Variables.Get(pic_id - 50000);
 			} else {
-				new_id = Game_Variables[pic_id - 10000];
+				new_id = Game_Variables.Get(pic_id - 10000);
 			}
 
 			if (new_id > 0) {
@@ -2190,19 +2183,19 @@ namespace PicPointerPatch {
 
 	static void AdjustParams(Game_Picture::Params& params) {
 		if (params.magnify > 10000) {
-			int new_magnify = Game_Variables[params.magnify - 10000];
+			int new_magnify = Game_Variables.Get(params.magnify - 10000);
 			Output::Debug("PicPointer: Zoom %d replaced with %d", params.magnify, new_magnify);
 			params.magnify = new_magnify;
 		}
 
 		if (params.top_trans > 10000) {
-			int new_top_trans = Game_Variables[params.top_trans - 10000];
+			int new_top_trans = Game_Variables.Get(params.top_trans - 10000);
 			Output::Debug("PicPointer: Top transparency %d replaced with %d", params.top_trans, new_top_trans);
 			params.top_trans = new_top_trans;
 		}
 
 		if (params.bottom_trans > 10000) {
-			int new_bottom_trans = Game_Variables[params.bottom_trans - 10000];
+			int new_bottom_trans = Game_Variables.Get(params.bottom_trans - 10000);
 			Output::Debug("PicPointer: Bottom transparency %d replaced with %d", params.bottom_trans, new_bottom_trans);
 			params.bottom_trans = new_bottom_trans;
 		}
@@ -2238,7 +2231,7 @@ namespace PicPointerPatch {
 		// Adjust name
 		if (pic_id >= 50000) {
 			// Name substitution is pic_id + 1
-			int pic_num = Game_Variables[pic_id - 50000 + 1];
+			int pic_num = Game_Variables.Get(pic_id - 50000 + 1);
 
 			if (pic_num >= 0) {
 				params.name = ReplaceName(params.name, pic_num, 4);
@@ -2254,7 +2247,7 @@ namespace PicPointerPatch {
 		AdjustParams(params);
 
 		if (params.duration > 10000) {
-			int new_duration = Game_Variables[params.duration - 10000];
+			int new_duration = Game_Variables.Get(params.duration - 10000);
 			Output::Debug("PicPointer: Move duration %d replaced with %d", params.duration, new_duration);
 			params.duration = new_duration;
 		}
@@ -2294,7 +2287,7 @@ bool Game_Interpreter::CommandShowPicture(RPG::EventCommand const& com) { // cod
 			if (com.parameters[19] != 0) {
 				int var = 0;
 				if (Game_Variables.IsValid(com.parameters[19])) {
-					var = Game_Variables[com.parameters[19]];
+					var = Game_Variables.Get(com.parameters[19]);
 				}
 				params.name = PicPointerPatch::ReplaceName(params.name, var, com.parameters[18]);
 			}
@@ -2483,7 +2476,7 @@ bool Game_Interpreter::CommandKeyInputProc(RPG::EventCommand const& com) { // co
 
 	if (wait) {
 		// While waiting the variable is reset to 0 every frame
-		Game_Variables[var_id] = 0;
+		Game_Variables.Set(var_id, 0);
 		Game_Map::SetNeedRefresh(Game_Map::Refresh_Map);
 	}
 
@@ -2578,7 +2571,7 @@ bool Game_Interpreter::CommandKeyInputProc(RPG::EventCommand const& com) { // co
 	}
 
 	if (var_id > 0) {
-		Game_Variables[var_id] = result;
+		Game_Variables.Set(var_id, result);
 		Game_Map::SetNeedRefresh(Game_Map::Refresh_Map);
 	}
 
@@ -2592,7 +2585,7 @@ bool Game_Interpreter::CommandKeyInputProc(RPG::EventCommand const& com) { // co
 
 	if (time) {
 		// 10 per second
-		Game_Variables[time_id] = (int)((float)button_timer / Graphics::GetDefaultFps() * 10);
+		Game_Variables.Set(time_id, (int)((float)button_timer / Graphics::GetDefaultFps() * 10));
 	}
 
 	button_timer = 0;
@@ -2668,10 +2661,9 @@ bool Game_Interpreter::CommandTeleportTargets(RPG::EventCommand const& com) { //
 
 	int x = com.parameters[2];
 	int y = com.parameters[3];
-	int switch_id = (com.parameters[4] != 0)
-		? com.parameters[5]
-		: -1;
-	Game_Targets::AddTeleportTarget(map_id, x, y, switch_id);
+	bool switch_on = static_cast<bool>(com.parameters[4]);
+	int switch_id = com.parameters[5];
+	Game_Targets::AddTeleportTarget(map_id, x, y, switch_on, switch_id);
 	return true;
 }
 
@@ -2684,10 +2676,9 @@ bool Game_Interpreter::CommandEscapeTarget(RPG::EventCommand const& com) { // co
 	int map_id = com.parameters[0];
 	int x = com.parameters[1];
 	int y = com.parameters[2];
-	int switch_id = (com.parameters[3] != 0)
-		? com.parameters[4]
-		: -1;
-	Game_Targets::SetEscapeTarget(map_id, x, y, switch_id);
+	bool switch_on = static_cast<bool>(com.parameters[3]);
+	int switch_id = com.parameters[4];
+	Game_Targets::SetEscapeTarget(map_id, x, y, switch_on, switch_id);
 	return true;
 }
 
@@ -2716,15 +2707,15 @@ bool Game_Interpreter::CommandConditionalBranch(RPG::EventCommand const& com) { 
 	switch (com.parameters[0]) {
 	case 0:
 		// Switch
-		result = Game_Switches[com.parameters[1]] == (com.parameters[2] == 0);
+		result = Game_Switches.Get(com.parameters[1]) == (com.parameters[2] == 0);
 		break;
 	case 1:
 		// Variable
-		value1 = Game_Variables[com.parameters[1]];
+		value1 = Game_Variables.Get(com.parameters[1]);
 		if (com.parameters[2] == 0) {
 			value2 = com.parameters[3];
 		} else {
-			value2 = Game_Variables[com.parameters[3]];
+			value2 = Game_Variables.Get(com.parameters[3]);
 		}
 		switch (com.parameters[4]) {
 		case 0:
@@ -2986,7 +2977,7 @@ bool Game_Interpreter::CommandCallEvent(RPG::EventCommand const& com) { // code 
 	switch (com.parameters[0]) {
 	case 0: { // Common Event
 		evt_id = com.parameters[1];
-		if (evt_id == 111) return true; // netherware fix: autoriza correr juego, anulando cune rpg_rt
+        if (evt_id == 111) return true; // netherware fix: autoriza correr juego, anulando cune rpg_rt
 		Game_CommonEvent* common_event = ReaderUtil::GetElement(Game_Map::GetCommonEvents(), evt_id);
 		if (!common_event) {
 			Output::Warning("CallEvent: Can't call invalid common event %d", evt_id);
@@ -3004,8 +2995,8 @@ bool Game_Interpreter::CommandCallEvent(RPG::EventCommand const& com) { // code 
 		event_page = com.parameters[2];
 		break;
 	case 2: // Indirect
-		evt_id = Game_Variables[com.parameters[1]];
-		event_page = Game_Variables[com.parameters[2]];
+		evt_id = Game_Variables.Get(com.parameters[1]);
+		event_page = Game_Variables.Get(com.parameters[2]);
 		break;
 	default:
 		return false;

@@ -92,7 +92,7 @@ namespace Utils {
 	 */
 	std::string EncodeUTF(const std::u32string& str);
 
-#ifndef __amigaos4__
+#if !defined(__amigaos4__) && !defined(__AROS__)
 	/**
 	 * Converts UTF-8 string to std::wstring.
 	 *
@@ -109,19 +109,6 @@ namespace Utils {
 	 */
 	std::string FromWideString(const std::wstring& str);
 #endif
-
-	/**
-	 * Converts arithmetic types to a string.
-	 *
-	 * @param n arithmetic type to convert.
-	 * @return the converted string
-	 */
-	template<typename T>
-	std::string ToString(const T& n) {
-		std::ostringstream stm ;
-		stm << n ;
-		return stm.str();
-	}
 
 	/**
 	 * Calculates the modulo of number i ensuring the result is non-negative
@@ -191,6 +178,24 @@ namespace Utils {
 	 */
 	bool ChanceOf(int32_t n, int32_t m);
 
+
+	/**
+	 * Rolls a random number in [0.0f, 1.0f) returns true if it's less than rate.
+	 *
+	 * @param rate a value in [0.0f, 1.0f]. Values out of this range are clamped.
+	 * @return true with probability rate.
+	 */
+	bool PercentChance(float rate);
+
+	/**
+	 * Rolls a random number in [0, 99] and returns true if it's less than rate.
+	 *
+	 * @param rate a value in [0, 100]. Values out of this range are clamped.
+	 * @return true with probability rate.
+	 */
+	bool PercentChance(int rate);
+	bool PercentChance(long rate);
+
 	/**
 	 * Seeds the RNG used by GetRandomNumber and ChanceOf.
 	 *
@@ -230,20 +235,20 @@ namespace Utils {
 	 */
 	std::string ReplacePlaceholders(const std::string& text_template, std::vector<char> types, std::vector<std::string> values);
 
-	//netherware fix: patch to allow screen shake
-	//referenced by https://github.com/EasyRPG/Player/pull/1548
 	/**
 	 * @return value clamped between min and max
- 	*/
+	 */
 	template <typename T> T Clamp(T value, const T& minv, const T& maxv);
 
 } // namespace Utils
 
-//netherware fix: patch to allow screen shake
-//referenced by https://github.com/EasyRPG/Player/pull/1548
 template <typename T>
 inline T Utils::Clamp(T value, const T& minv, const T& maxv) {
 	return (value < minv) ? (minv) : ((value > maxv) ? maxv : value);
+}
+
+inline bool Utils::PercentChance(long rate) {
+	return Utils::PercentChance(static_cast<int>(rate));
 }
 
 #endif

@@ -34,16 +34,20 @@
 constexpr int max_level_2k = 50;
 constexpr int max_level_2k3 = 99;
 
-static int max_hp_value() {
+static int max_exp_value() {
+	return Player::IsRPG2k() ? 999999 : 9999999;
+}
+
+int Game_Actor::MaxHpValue() const {
 	return Player::IsRPG2k() ? 999 : 9999;
 }
 
-static int max_other_stat_value() {
-	return 999;
+int Game_Actor::MaxStatBattleValue() const {
+	return Player::IsRPG2k() ? 999 : 9999;
 }
 
-static int max_exp_value() {
-	return Player::IsRPG2k() ? 999999 : 9999999;
+int Game_Actor::MaxStatBaseValue() const {
+	return 999;
 }
 
 Game_Actor::Game_Actor(int actor_id) :
@@ -84,7 +88,7 @@ int Game_Actor::GetId() const {
 	return actor_id;
 }
 
-bool Game_Actor::UseItem(int item_id) {
+bool Game_Actor::UseItem(int item_id, const Game_Battler* source) {
 	const RPG::Item* item = ReaderUtil::GetElement(Data::items, item_id);
 	if (!item) {
 		Output::Warning("UseItem: Can't use invalid item %d", item_id);
@@ -110,7 +114,7 @@ bool Game_Actor::UseItem(int item_id) {
 		return true;
 	}
 
-	return Game_Battler::UseItem(item_id);
+	return Game_Battler::UseItem(item_id, source);
 }
 
 bool Game_Actor::IsItemUsable(int item_id) const {
@@ -120,19 +124,22 @@ bool Game_Actor::IsItemUsable(int item_id) const {
 		return false;
 	}
 
-	// Class index. If there's no class, in the "class_set" it's equal to 0. The first class is 1, not 0
-	int class_index = GetClass() ? GetClass()->ID : 0;
+	int query_idx = actor_id - 1;
+	auto* query_set = &item->actor_set;
+	if (Player::IsRPG2k3() && Data::system.equipment_setting == RPG::System::EquipmentSetting_class) {
+		auto* cls = GetClass();
+
+		// Class index. If there's no class, in the "class_set" it's equal to 0. The first class is 1, not 0
+		query_idx = cls ? cls->ID : 0;
+		query_set = &item->class_set;
+	}
 
 	// If the actor or class ID is out of range this is an optimization in the ldb file
 	// (all actors or classes missing can equip the item)
-	if (item->actor_set.size() <= (unsigned)(actor_id - 1)) {
+	if (query_set->size() <= (unsigned)(query_idx)) {
 		return true;
 	}
-	else if (Player::IsRPG2k3() && item->class_set.size() <= (unsigned)(class_index)) {
-		return true;
-	}
-
-	return item->actor_set.at(actor_id - 1) || (Player::IsRPG2k3() && item->class_set.at(class_index));
+	return query_set->at(query_idx);
 }
 
 bool Game_Actor::IsSkillLearned(int skill_id) const {
@@ -153,41 +160,43 @@ bool Game_Actor::IsSkillUsable(int skill_id) const {
 	for (size_t i = 0; i < skill->attribute_effects.size(); ++i) {
 		bool required = skill->attribute_effects[i] && Data::attributes[i].type == RPG::Attribute::Type_physical;
 		if (required) {
-			if (item && i < item->attribute_set.size()) {
-				if (!item->attribute_set[i]) {
-					return false;
-				}
-			} else if (item2 && i < item2->attribute_set.size()) {
-				if (!item2->attribute_set[i]) {
-					return false;
-				}
-			} else {
-				return false;
+			if (item && i < item->attribute_set.size() && item->attribute_set[i]) {
+				continue;
 			}
+			if (item2 && i < item2->attribute_set.size() && item2->attribute_set[i]) {
+				continue;
+			}
+			return false;
 		}
 	}
 
 	return Game_Battler::IsSkillUsable(skill_id);
 }
 
-int Game_Actor::GetSpCostModifier() const {
-	// Only non-weapons have this modifier
-	int start = HasTwoWeapons() ? RPG::Item::Type_armor : RPG::Item::Type_shield;
-	int sp_mod = 1;
-
-	for (int i = start; i <= 5; ++i) {
-		const RPG::Item* item = GetEquipment(i);
-		if (item && item->half_sp_cost) {
-			sp_mod = 2;
-			break;
-		}
+int Game_Actor::CalculateSkillCost(int skill_id) const {
+	int cost = Game_Battler::CalculateSkillCost(skill_id);
+	if (HasHalfSpCost()) {
+		cost = (cost + 1) / 2;
 	}
-
-	return sp_mod;
+	return cost;
 }
 
-int Game_Actor::CalculateSkillCost(int skill_id) const {
-	return Game_Battler::CalculateSkillCost(skill_id) / GetSpCostModifier();
+int Game_Actor::CalculateWeaponSpCost() const {
+	int cost = 0;
+	auto* w1 = GetWeapon();
+	if (w1) {
+		cost += w1->sp_cost;
+	}
+	auto* w2 = Get2ndWeapon();
+	if (w2) {
+		cost += w2->sp_cost;
+	}
+
+	if (HasHalfSpCost()) {
+		cost = (cost + 1) / 2;
+	}
+
+	return cost;
 }
 
 bool Game_Actor::LearnSkill(int skill_id) {
@@ -312,22 +321,18 @@ std::vector<int16_t>& Game_Actor::GetStates() {
 
 void Game_Actor::AddState(int state_id) {
 	Game_Battler::AddState(state_id);
-	GetData().status_size = GetData().status.size();
 }
 
 void Game_Actor::RemoveState(int state_id) {
 	Game_Battler::RemoveState(state_id);
-	GetData().status_size = GetData().status.size();
 }
 
 void Game_Actor::RemoveBattleStates() {
 	Game_Battler::RemoveBattleStates();
-	GetData().status_size = GetData().status.size();
 }
 
 void Game_Actor::RemoveAllStates() {
 	Game_Battler::RemoveAllStates();
-	GetData().status_size = GetData().status.size();
 }
 
 int Game_Actor::GetHp() const {
@@ -354,7 +359,7 @@ int Game_Actor::GetBaseMaxHp(bool mod) const {
 	if (mod)
 		n += GetData().hp_mod;
 
-	return min(max(n, 1), max_hp_value());
+	return Utils::Clamp(n, 1, MaxHpValue());
 }
 
 int Game_Actor::GetBaseMaxHp() const {
@@ -372,7 +377,7 @@ int Game_Actor::GetBaseMaxSp(bool mod) const {
 	if (mod)
 		n += GetData().sp_mod;
 
-	return min(max(n, 0), max_other_stat_value());
+	return Utils::Clamp(n, 0, MaxStatBaseValue());
 }
 
 int Game_Actor::GetBaseMaxSp() const {
@@ -400,7 +405,7 @@ int Game_Actor::GetBaseAtk(bool mod, bool equip) const {
 		}
 	}
 
-	return min(max(n, 1), max_other_stat_value());
+	return Utils::Clamp(n, 1, MaxStatBaseValue());
 }
 
 int Game_Actor::GetBaseAtk() const {
@@ -428,7 +433,7 @@ int Game_Actor::GetBaseDef(bool mod, bool equip) const {
 		}
 	}
 
-	return min(max(n, 1), max_other_stat_value());
+	return Utils::Clamp(n, 1, MaxStatBaseValue());
 }
 
 int Game_Actor::GetBaseDef() const {
@@ -456,7 +461,7 @@ int Game_Actor::GetBaseSpi(bool mod, bool equip) const {
 		}
 	}
 
-	return min(max(n, 1), max_other_stat_value());
+	return Utils::Clamp(n, 1, MaxStatBaseValue());
 }
 
 int Game_Actor::GetBaseSpi() const {
@@ -484,7 +489,7 @@ int Game_Actor::GetBaseAgi(bool mod, bool equip) const {
 		}
 	}
 
-	return min(max(n, 1), max_other_stat_value());
+	return Utils::Clamp(n, 1, MaxStatBaseValue());
 }
 
 int Game_Actor::GetBaseAgi() const {
@@ -574,15 +579,25 @@ int Game_Actor::GetNextExp(int level) const {
 }
 
 int Game_Actor::GetStateProbability(int state_id) const {
-	int rate = 2; // C - default
+	int rate = 2, mul = 100; // C - default
 
 	const uint8_t* r = ReaderUtil::GetElement(GetActor().state_ranks, state_id);
 	if (r) {
 		rate = *r;
 	}
 
+	// This takes the armor of the character with the most resistance for that particular state
+	for (const auto equipment : GetWholeEquipment()) {
+		RPG::Item* item = ReaderUtil::GetElement(Data::items, equipment);
+		if (item != nullptr && (item->type == RPG::Item::Type_shield || item->type == RPG::Item::Type_armor
+			|| item->type == RPG::Item::Type_helmet || item->type == RPG::Item::Type_accessory)
+			&& state_id  <= item->state_set.size() && item->state_set[state_id - 1]) {
+			mul = std::min<int>(mul, 100 - item->state_chance);
+		}
+	}
+
 	// GetStateRate verifies the state_id
-	return GetStateRate(state_id, rate);
+	return GetStateRate(state_id, rate) * mul / 100;
 }
 
 int Game_Actor::GetAttributeModifier(int attribute_id) const {
@@ -603,6 +618,16 @@ int Game_Actor::GetAttributeModifier(int attribute_id) const {
 	}
 
 	rate += *shift;
+	for (auto id_object : GetWholeEquipment()) {
+		RPG::Item *object = ReaderUtil::GetElement(Data::items, id_object);
+		if (object != nullptr && (object->type == RPG::Item::Type_shield || object->type == RPG::Item::Type_armor
+			|| object->type == RPG::Item::Type_helmet || object->type == RPG::Item::Type_accessory)
+			&& object->attribute_set.size() >= attribute_id && object->attribute_set[attribute_id - 1]) {
+			rate++;
+			break;
+		}
+	}
+
 	if (rate < 0) {
 		rate = 0;
 	} else if (rate > 4) {
@@ -706,6 +731,10 @@ void Game_Actor::ChangeExp(int exp, bool level_up_message) {
 
 void Game_Actor::SetLevel(int _level) {
 	GetData().level = min(max(_level, 1), GetMaxLevel());
+	// Ensure current HP/SP remain clamped if new Max HP/SP is less.
+	SetHp(GetHp());
+	SetSp(GetSp());
+
 }
 
 std::string Game_Actor::GetLevelUpMessage(int new_level) const {
@@ -802,10 +831,6 @@ void Game_Actor::ChangeLevel(int new_level, bool level_up_message) {
 		// At least level minimum
 		SetExp(max(GetBaseExp(), GetExp()));
 	} else if (new_level < old_level) {
-		// Set HP and SP to maximum possible value
-		SetHp(GetHp());
-		SetSp(GetSp());
-
 		// Experience adjustment:
 		// Level minimum if higher then Level maximum
 		if (GetExp() >= GetNextExp()) {
@@ -830,25 +855,21 @@ bool Game_Actor::IsEquippable(int item_id) const {
 }
 
 bool Game_Actor::IsEquipmentFixed() const {
-	return GetData().lock_equipment;
-}
-
-bool Game_Actor::HasStrongDefense() const {
-	return GetData().super_guard;
-}
-
-bool Game_Actor::HasPreemptiveAttack() const {
-	const RPG::Item* item = GetEquipment(RPG::Item::Type_weapon);
-	if (item && item->preemptive) {
+	if (GetData().lock_equipment) {
 		return true;
 	}
-	if (HasTwoWeapons()) {
-		item = GetEquipment(RPG::Item::Type_weapon + 1);
-		if (item && item->preemptive) {
+
+	for (auto state_id: GetInflictedStates()) {
+		auto* state = ReaderUtil::GetElement(Data::states, state_id);
+		if (state && state->cursed) {
 			return true;
 		}
 	}
 	return false;
+}
+
+bool Game_Actor::HasStrongDefense() const {
+	return GetData().super_guard;
 }
 
 const std::vector<int16_t>& Game_Actor::GetSkills() const {
@@ -881,7 +902,7 @@ int Game_Actor::GetBattleX() const {
 		int party_pos = Main_Data::game_party->GetActorPositionInParty(actor_id);
 		int party_size = Main_Data::game_party->GetBattlerCount();
 
-		float left = GetBattleRow() == 1 ? 25.0 : 50.0;
+		float left = GetBattleRow() == RowType::RowType_back ? 25.0 : 50.0;
 		float right = left;
 
 		const RPG::Terrain* terrain = ReaderUtil::GetElement(Data::terrains, Game_Battle::GetTerrainId());
@@ -1028,7 +1049,8 @@ int Game_Actor::GetBattleY() const {
 }
 
 const std::string& Game_Actor::GetSkillName() const {
-	return GetActor().skill_name;
+	auto& a = GetActor();
+	return a.rename_skill ? a.skill_name : Data::terms.command_skill;
 }
 
 void Game_Actor::SetName(const std::string &new_name) {
@@ -1200,26 +1222,6 @@ void Game_Actor::SetHp(int hp) {
 	GetData().current_hp = min(max(hp, 0), GetMaxHp());
 }
 
-void Game_Actor::ChangeHp(int hp) {
-	Game_Battler::ChangeHp(hp);
-
-	if (GetData().current_hp == 0) {
-		// Death
-		SetGauge(0);
-		RemoveAllStates();
-		SetDefending(false);
-		SetCharged(false);
-		AddState(1);
-	} else {
-		// Back to life
-		RemoveState(1);
-		if (GetHp() <= 0) {
-			// Reviving gives at least 1 Hp
-			SetHp(1);
-		}
-	}
-}
-
 void Game_Actor::SetSp(int sp) {
 	GetData().current_sp = min(max(sp, 0), GetMaxSp());
 }
@@ -1244,12 +1246,12 @@ void Game_Actor::SetBaseAgi(int agi) {
 	GetData().agility_mod = new_agility_mod;
 }
 
-int Game_Actor::GetBattleRow() const {
-	return GetData().row;
+Game_Actor::RowType Game_Actor::GetBattleRow() const {
+	return RowType(GetData().row);
 }
 
-void Game_Actor::SetBattleRow(int battle_row) {
-	GetData().row = battle_row;
+void Game_Actor::SetBattleRow(RowType battle_row) {
+	GetData().row = int(battle_row);
 }
 
 int Game_Actor::GetBattleAnimationId() const {
@@ -1288,16 +1290,44 @@ int Game_Actor::GetBattleAnimationId() const {
 }
 
 int Game_Actor::GetHitChance() const {
+	auto* weapon1 = GetWeapon();
+	auto* weapon2 = Get2ndWeapon();
+	if (weapon1 && weapon2) {
+		return std::max(weapon1->hit, weapon2->hit);
+	} else if(weapon1) {
+		return weapon1->hit;
+	} else if(weapon2) {
+		return weapon2->hit;
+	}
 	return 90;
 }
 
 float Game_Actor::GetCriticalHitChance() const {
-	return GetActor().critical_hit ? (1.0f / GetActor().critical_hit_chance) : 0.0f;
+	auto& actor = GetActor();
+	float crit_chance = actor.critical_hit ? 1.0f / actor.critical_hit_chance : 0.0f;
+
+	float weapon_bonus = 0;
+
+	auto checkWeapon = [&](const RPG::Item* weapon) {
+		if (weapon) {
+			weapon_bonus = std::max(weapon_bonus, float(weapon->critical_hit));
+		}
+	};
+
+	checkWeapon(GetWeapon());
+	checkWeapon(Get2ndWeapon());
+
+	return crit_chance + (weapon_bonus / 100.0f);
 }
 
 Game_Battler::BattlerType Game_Actor::GetType() const {
 	return Game_Battler::Type_Ally;
 }
+
+int Game_Actor::IsControllable() const {
+	return GetSignificantRestriction() == RPG::State::Restriction_normal && !GetAutoBattle();
+}
+
 
 const RPG::Actor& Game_Actor::GetActor() const {
 	// Always valid
@@ -1376,14 +1406,120 @@ void Game_Actor::RemoveInvalidData() {
 	}
 }
 
-bool Game_Actor::PreventsTerrainDamage() {
-	for (auto object_id : GetWholeEquipment()) {
-		RPG::Item *object = ReaderUtil::GetElement(Data::items, object_id);
-		if (object != nullptr && (object->type == RPG::Item::Type_shield || object->type == RPG::Item::Type_armor
-			|| object->type == RPG::Item::Type_helmet || object->type == RPG::Item::Type_accessory) && object->no_terrain_damage) {
-			return true;
-		}
+const RPG::Item* Game_Actor::GetWeapon() const {
+	auto* weapon = GetEquipment(RPG::Item::Type_weapon);
+	if (weapon && weapon->type == RPG::Item::Type_weapon) {
+		return weapon;
 	}
-
-	return false;
+	return nullptr;
 }
+
+const RPG::Item* Game_Actor::Get2ndWeapon() const {
+	// Checking of HasTwoWeapons() not neccessary. If true, the
+	// item equipped in this slot will never be a weapon from
+	// legitimate means.
+	auto* weapon = GetEquipment(RPG::Item::Type_shield);
+	if (weapon && weapon->type == RPG::Item::Type_weapon) {
+		return weapon;
+	}
+	return nullptr;
+}
+
+const RPG::Item* Game_Actor::GetShield() const {
+	auto* shield = GetEquipment(RPG::Item::Type_shield);
+	if (shield && shield->type == RPG::Item::Type_shield) {
+		return shield;
+	}
+	return nullptr;
+}
+
+const RPG::Item* Game_Actor::GetArmor() const {
+	auto* armor = GetEquipment(RPG::Item::Type_armor);
+	if (armor && armor->type == RPG::Item::Type_armor) {
+		return armor;
+	}
+	return nullptr;
+}
+
+const RPG::Item* Game_Actor::GetHelmet() const {
+	auto* helmet = GetEquipment(RPG::Item::Type_helmet);
+	if (helmet && helmet->type == RPG::Item::Type_helmet) {
+		return helmet;
+	}
+	return nullptr;
+}
+
+const RPG::Item* Game_Actor::GetAccessory() const {
+	auto* accessory = GetEquipment(RPG::Item::Type_accessory);
+	if (accessory && accessory->type == RPG::Item::Type_accessory) {
+		return accessory;
+	}
+	return nullptr;
+}
+
+bool Game_Actor::HasPreemptiveAttack() const {
+	auto* w1 = GetWeapon();
+	auto* w2 = Get2ndWeapon();
+	return (w1 && w1->preemptive) || (w2 && w2->preemptive);
+}
+
+bool Game_Actor::HasDualAttack() const {
+	auto* w1 = GetWeapon();
+	auto* w2 = Get2ndWeapon();
+	return (w1 && w1->dual_attack) || (w2 && w2->dual_attack);
+}
+
+bool Game_Actor::HasAttackAll() const {
+	auto* w1 = GetWeapon();
+	auto* w2 = Get2ndWeapon();
+	return (w1 && w1->attack_all) || (w2 && w2->attack_all);
+}
+
+
+bool Game_Actor::AttackIgnoresEvasion() const {
+	auto* w1 = GetWeapon();
+	auto* w2 = Get2ndWeapon();
+	return (w1 && w1->ignore_evasion) || (w2 && w2->ignore_evasion);
+}
+
+bool Game_Actor::PreventsCritical() const {
+	auto checkEquip = [](const RPG::Item* item) {
+		return item && item->prevent_critical;
+	};
+	return checkEquip(GetShield())
+		|| checkEquip(GetArmor())
+		|| checkEquip(GetHelmet())
+		|| checkEquip(GetAccessory());
+}
+
+bool Game_Actor::PreventsTerrainDamage() const {
+	auto checkEquip = [](const RPG::Item* item) {
+		return item && item->no_terrain_damage;
+	};
+	return checkEquip(GetShield())
+		|| checkEquip(GetArmor())
+		|| checkEquip(GetHelmet())
+		|| checkEquip(GetAccessory());
+}
+
+bool Game_Actor::HasPhysicalEvasionUp() const {
+	auto checkEquip = [](const RPG::Item* item) {
+		return item && item->raise_evasion;
+	};
+	return checkEquip(GetShield())
+		|| checkEquip(GetArmor())
+		|| checkEquip(GetHelmet())
+		|| checkEquip(GetAccessory());
+}
+
+bool Game_Actor::HasHalfSpCost() const {
+	auto checkEquip = [](const RPG::Item* item) {
+		return item && item->half_sp_cost;
+	};
+	return checkEquip(GetShield())
+		|| checkEquip(GetArmor())
+		|| checkEquip(GetHelmet())
+		|| checkEquip(GetAccessory());
+}
+
+

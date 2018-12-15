@@ -18,6 +18,7 @@
 #include "player.h"
 #include <cstdlib>
 
+//netherware fix: steamshim
 #ifdef STEAMSHIM
 #   include "../steamshim/steamshim_child.h"
 #endif
@@ -28,7 +29,7 @@
 #endif
 
 extern "C" int main(int argc, char* argv[]) {
-
+//netherware fix: steamshim
 #ifdef STEAMSHIM
 	//Initialize steamshim
 	if (!STEAMSHIM_init()) {
@@ -39,9 +40,10 @@ extern "C" int main(int argc, char* argv[]) {
 	STEAMSHIM_requestStats();
 
 #endif
+
 	Player::Init(argc, argv);
 	Player::Run();
-
+//netherware fix: shutdown steamshim
 #ifdef STEAMSHIM
 	//Shutdown steamshim
     STEAMSHIM_deinit();

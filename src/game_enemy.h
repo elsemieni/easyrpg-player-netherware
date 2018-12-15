@@ -33,6 +33,12 @@ public:
 	const std::vector<int16_t>& GetStates() const override;
 	std::vector<int16_t>& GetStates() override;
 
+	int MaxHpValue() const override;
+
+	int MaxStatBattleValue() const override;
+
+	int MaxStatBaseValue() const override;
+
 	/**
 	 * Gets probability that a state can be inflicted on this actor.
 	 *
@@ -143,7 +149,6 @@ public:
 
 	int GetHp() const override;
 	void SetHp(int _hp) override;
-	void ChangeHp(int hp) override;
 
 	int GetSp() const override;
 	void SetSp(int _sp) override;
@@ -163,6 +168,8 @@ public:
 	int GetFlyingOffset() const override;
 
 	void UpdateBattle() override;
+
+	bool IsTransparent() const;
 
 	/**
 	 * Get's the ID of the item the enemy drops when defeated.

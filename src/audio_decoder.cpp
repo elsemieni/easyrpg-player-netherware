@@ -146,27 +146,29 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 #ifdef HAVE_WILDMIDI
 		static bool wildmidi_works = true;
 		if (wildmidi_works) {
-			AudioDecoder *mididec = nullptr;
+			auto mididec = std::unique_ptr<AudioDecoder>(new WildMidiDecoder(filename));
+			if (mididec->WasInited()) {
 #  ifdef USE_AUDIO_RESAMPLER
-			mididec = new AudioResampler(new WildMidiDecoder(filename));
-#  else
-			mididec = new WildMidiDecoder(filename);
+				mididec = std::unique_ptr<AudioResampler>(new AudioResampler(std::move(mididec)));
 #  endif
-			if (mididec) {
-				if (mididec->WasInited())
-					return std::unique_ptr<AudioDecoder>(mididec);
-
-				delete mididec;
+				return mididec;
+			} else {
+				wildmidi_works = false;
+				Output::Debug("WildMidi Failed: %s", mididec->GetError().c_str());
 			}
-			wildmidi_works = false;
 		}
 #endif
 #if WANT_FMMIDI == 1
+		auto mididec = std::unique_ptr<AudioDecoder>(new FmMidiDecoder());
+
+		if (mididec->WasInited()) {
 #  ifdef USE_AUDIO_RESAMPLER
-		return std::unique_ptr<AudioDecoder>(new AudioResampler(new FmMidiDecoder(), true, AudioResampler::Quality::Low));
-#  else
-		return std::unique_ptr<AudioDecoder>(new FmMidiDecoder());
+			mididec = std::unique_ptr<AudioResampler>(new AudioResampler(std::move(mididec), true, AudioResampler::Quality::Low));
 #  endif
+			return mididec;
+		} else {
+			Output::Debug("FmMidi Failed: %s", mididec->GetError().c_str());
+		}
 #endif
 		// No MIDI decoder available
 		return nullptr;
@@ -176,13 +178,13 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 	//Netherware fix: support for nsfx header
 	if (!strncmp(magic, "OggS", 4) || !strncmp(magic, "nSFx", 4)) { // OGG
 #ifdef HAVE_OPUS
-		fseek(file, 28, SEEK_SET); //28 el original
+		fseek(file, 28, SEEK_SET);
 		if (fread(magic, 4, 1, file) != 1)
 			return nullptr;
 		fseek(file, 0, SEEK_SET);
 		if (!strncmp(magic, "Opus", 4)) {
 #  ifdef USE_AUDIO_RESAMPLER
-			return std::unique_ptr<AudioDecoder>(new AudioResampler(new OpusDecoder()));
+			return std::unique_ptr<AudioDecoder>(new AudioResampler(std::unique_ptr<AudioDecoder>(new OpusDecoder())));
 #  else
 			return std::unique_ptr<AudioDecoder>(new OpusDecoder());
 #  endif
@@ -197,7 +199,7 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 
 		if (!strncmp(magic, "vorb", 4)) {
 #  ifdef USE_AUDIO_RESAMPLER
-			return std::unique_ptr<AudioDecoder>(new AudioResampler(new OggVorbisDecoder()));
+			return std::unique_ptr<AudioDecoder>(new AudioResampler(std::unique_ptr<AudioDecoder>(new OggVorbisDecoder())));
 #  else
 			return std::unique_ptr<AudioDecoder>(new OggVorbisDecoder());
 #  endif
@@ -216,7 +218,7 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 		fseek(file, 0, SEEK_SET);
 		if (raw_enc == 0x01) { // Codec is normal PCM
 #  ifdef USE_AUDIO_RESAMPLER
-			return std::unique_ptr<AudioDecoder>(new AudioResampler(new WavDecoder()));
+			return std::unique_ptr<AudioDecoder>(new AudioResampler(std::unique_ptr<AudioDecoder>(new WavDecoder())));
 #  else
 			return std::unique_ptr<AudioDecoder>(new WavDecoder());
 #  endif
@@ -232,7 +234,7 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 		!strncmp(magic, "fLaC", 4)) { // FLAC
 #ifdef HAVE_LIBSNDFILE
 #  ifdef USE_AUDIO_RESAMPLER
-		return std::unique_ptr<AudioDecoder>(new AudioResampler(new LibsndfileDecoder()));
+		return std::unique_ptr<AudioDecoder>(new AudioResampler(std::unique_ptr<AudioDecoder>(new LibsndfileDecoder())));
 #  else
 		return std::unique_ptr<AudioDecoder>(new LibsndfileDecoder());
 #  endif
@@ -249,7 +251,7 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 #ifdef HAVE_XMP
 	if (XMPDecoder::IsModule(filename)) {
 #  ifdef USE_AUDIO_RESAMPLER
-		return std::unique_ptr<AudioDecoder>(new AudioResampler(new XMPDecoder()));
+		return std::unique_ptr<AudioDecoder>(new AudioResampler(std::unique_ptr<AudioDecoder>(new XMPDecoder())));
 #  else
 		return std::unique_ptr<AudioDecoder>(new XMPDecoder());
 #  endif
@@ -263,7 +265,7 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 		AudioDecoder *mp3dec = nullptr;
 		if (strncmp(magic, "ID3", 3) == 0) {
 #  ifdef USE_AUDIO_RESAMPLER
-			mp3dec = new AudioResampler(new Mpg123Decoder());
+			mp3dec = new AudioResampler(std::unique_ptr<AudioDecoder>(new Mpg123Decoder()));
 #  else
 			mp3dec = new Mpg123Decoder();
 #  endif
@@ -281,7 +283,7 @@ std::unique_ptr<AudioDecoder> AudioDecoder::Create(FILE* file, const std::string
 		if (Mpg123Decoder::IsMp3(file)) {
 			fseek(file, 0, SEEK_SET);
 #  ifdef USE_AUDIO_RESAMPLER
-			mp3dec = new AudioResampler(new Mpg123Decoder());
+			mp3dec = new AudioResampler(std::unique_ptr<AudioDecoder>(new Mpg123Decoder()));
 #  else
 			mp3dec = new Mpg123Decoder();
 #  endif

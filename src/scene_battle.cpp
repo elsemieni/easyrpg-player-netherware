@@ -38,6 +38,7 @@
 #include "scene_battle_rpg2k.h"
 #include "scene_battle_rpg2k3.h"
 #include "scene_gameover.h"
+#include "scene_debug.h"
 
 Scene_Battle::Scene_Battle() :
 	actor_index(0),
@@ -45,6 +46,7 @@ Scene_Battle::Scene_Battle() :
 	skill_item(NULL)
 {
 	Scene::type = Scene::Battle;
+	Game_Temp::battle_result = Game_Temp::BattleAbort;
 }
 
 Scene_Battle::~Scene_Battle() {
@@ -87,19 +89,24 @@ void Scene_Battle::Start() {
 	auto_battle = false;
 	enemy_action = NULL;
 
-	CreateUi();
-
 	Game_System::BgmPlay(Game_System::GetSystemBGM(Game_System::BGM_Battle));
+
+	CreateUi();
 
 	SetState(State_Start);
 }
 
 void Scene_Battle::TransitionIn() {
-	Graphics::GetTransition().Init((Transition::TransitionType)Game_System::GetTransition(Game_System::Transition_BeginBattleShow), this, 32);
+	if (Game_Temp::transition_menu) {
+		Game_Temp::transition_menu = false;
+		Scene::TransitionIn();
+	} else {
+		Graphics::GetTransition().Init((Transition::TransitionType)Game_System::GetTransition(Game_System::Transition_BeginBattleShow), this, 32);
+	}
 }
 
 void Scene_Battle::TransitionOut() {
-	if (Player::exit_flag || Player::battle_test_flag) {
+	if (Player::exit_flag || Player::battle_test_flag || Game_Temp::transition_menu || Scene::instance->type == Scene::Title) {
 		Scene::TransitionOut();
 	}
 	else {
@@ -107,12 +114,16 @@ void Scene_Battle::TransitionOut() {
 	}
 }
 
+void Scene_Battle::DrawBackground() {
+	DisplayUi->CleanDisplay();
+}
+
 void Scene_Battle::CreateUi() {
 	std::vector<std::string> commands;
 	commands.push_back(Data::terms.battle_fight);
 	commands.push_back(Data::terms.battle_auto);
 	commands.push_back(Data::terms.battle_escape);
-	options_window.reset(new Window_Command(commands, 76));
+	options_window.reset(new Window_Command(commands, option_command_mov));
 	options_window->SetHeight(80);
 	options_window->SetY(SCREEN_TARGET_HEIGHT - 80);
 
@@ -124,10 +135,10 @@ void Scene_Battle::CreateUi() {
 	item_window->Refresh();
 	item_window->SetIndex(0);
 
-	skill_window.reset(new Window_Skill(0, (SCREEN_TARGET_HEIGHT-80), SCREEN_TARGET_WIDTH, 80));
+	skill_window.reset(new Window_BattleSkill(0, (SCREEN_TARGET_HEIGHT-80), SCREEN_TARGET_WIDTH, 80));
 	skill_window->SetHelpWindow(help_window.get());
 
-	status_window.reset(new Window_BattleStatus(0, (SCREEN_TARGET_HEIGHT-80), SCREEN_TARGET_WIDTH - 76, 80));
+	status_window.reset(new Window_BattleStatus(0, (SCREEN_TARGET_HEIGHT-80), SCREEN_TARGET_WIDTH - option_command_mov, 80));
 
 	message_window.reset(new Window_Message(0, (SCREEN_TARGET_HEIGHT - 80), SCREEN_TARGET_WIDTH, 80));
 }
@@ -171,6 +182,10 @@ void Scene_Battle::Update() {
 	if (Game_Battle::IsTerminating()) {
 		Scene::Pop();
 	}
+}
+
+bool Scene_Battle::IsWindowMoving() {
+	return options_window->IsMovementActive() || status_window->IsMovementActive() || command_window->IsMovementActive();
 }
 
 void Scene_Battle::InitBattleTest()
@@ -228,6 +243,7 @@ void Scene_Battle::EnemySelected() {
 		}
 	}
 
+	Game_System::SePlay(Game_System::GetSystemSE(Game_System::SFX_Decision));
 	ActionSelectedCallback(active_actor);
 }
 
@@ -251,14 +267,14 @@ void Scene_Battle::AllySelected() {
 		assert("Invalid previous state for ally selection" && false);
 	}
 
+	Game_System::SePlay(Game_System::GetSystemSE(Game_System::SFX_Decision));
 	ActionSelectedCallback(active_actor);
 }
 
 void Scene_Battle::AttackSelected() {
 	Game_System::SePlay(Game_System::GetSystemSE(Game_System::SFX_Decision));
 
-	const RPG::Item* item = active_actor->GetEquipment(RPG::Item::Type_weapon);
-	if (item && item->attack_all) {
+	if (active_actor->HasAttackAll()) {
 		active_actor->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::Normal>(active_actor, Main_Data::game_enemyparty.get()));
 		ActionSelectedCallback(active_actor);
 	} else {
@@ -413,6 +429,51 @@ std::shared_ptr<Scene_Battle> Scene_Battle::Create()
 	}
 }
 
+void Scene_Battle::UpdateBattlerActions() {
+	for (auto* battler: battle_actions) {
+		if (!battler->CanAct()) {
+			if (battler->GetBattleAlgorithm()->GetType() != Game_BattleAlgorithm::Type::NoMove) {
+				battler->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::NoMove>(battler));
+				battler->SetCharged(false);
+			}
+			continue;
+		}
+
+		if (battler->GetSignificantRestriction() == RPG::State::Restriction_attack_ally) {
+			if (battler->GetBattleAlgorithm()->GetSourceRestrictionWhenStarted() != RPG::State::Restriction_attack_ally) {
+				Game_Battler *target = battler->GetType() == Game_Battler::Type_Enemy ?
+					Main_Data::game_enemyparty->GetRandomActiveBattler() :
+					Main_Data::game_party->GetRandomActiveBattler();
+
+				battler->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::Normal>(battler, target));
+				battler->SetCharged(false);
+			}
+			continue;
+		}
+
+		if (battler->GetSignificantRestriction() == RPG::State::Restriction_attack_enemy) {
+			if (battler->GetBattleAlgorithm()->GetSourceRestrictionWhenStarted() != RPG::State::Restriction_attack_enemy) {
+				Game_Battler *target = battler->GetType() == Game_Battler::Type_Ally ?
+					Main_Data::game_enemyparty->GetRandomActiveBattler() :
+					Main_Data::game_party->GetRandomActiveBattler();
+
+				battler->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::Normal>(battler, target));
+				battler->SetCharged(false);
+			}
+			continue;
+		}
+
+		// If we had a state restriction previously but were recovered, we do nothing for this round.
+		if (battler->GetBattleAlgorithm()->GetSourceRestrictionWhenStarted() != RPG::State::Restriction_normal) {
+			if (battler->GetBattleAlgorithm()->GetType() != Game_BattleAlgorithm::Type::NoMove) {
+				battler->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::NoMove>(battler));
+				battler->SetCharged(false);
+			}
+			continue;
+		}
+	}
+}
+
 void Scene_Battle::CreateEnemyAction(Game_Enemy* enemy, const RPG::EnemyAction* action) {
 	switch (action->kind) {
 		case RPG::EnemyAction::Kind_basic:
@@ -443,8 +504,8 @@ void Scene_Battle::CreateEnemyActionBasic(Game_Enemy* enemy, const RPG::EnemyAct
 			enemy->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::Normal>(enemy, Main_Data::game_party->GetRandomActiveBattler()));
 			break;
 		case RPG::EnemyAction::Basic_dual_attack:
-			// ToDo: Must be NormalDual, not implemented
 			enemy->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::Normal>(enemy, Main_Data::game_party->GetRandomActiveBattler()));
+			enemy->GetBattleAlgorithm()->SetRepeat(2);
 			break;
 		case RPG::EnemyAction::Basic_defense:
 			enemy->SetBattleAlgorithm(std::make_shared<Game_BattleAlgorithm::Defend>(enemy));
@@ -477,7 +538,6 @@ void Scene_Battle::CreateEnemyActionBasic(Game_Enemy* enemy, const RPG::EnemyAct
 }
 
 void Scene_Battle::RemoveCurrentAction() {
-	battle_actions.front()->SetBattleAlgorithm(std::shared_ptr<Game_BattleAlgorithm::AlgorithmBase>());
 	battle_actions.pop_front();
 }
 
@@ -539,4 +599,17 @@ void Scene_Battle::ActionSelectedCallback(Game_Battler* for_battler) {
 	if (for_battler->GetType() == Game_Battler::Type_Ally) {
 		SetState(State_SelectActor);
 	}
+}
+
+void Scene_Battle::CallDebug() {
+	if (Player::debug_flag) {
+		Game_Temp::transition_menu = true;
+		Scene::Push(std::make_shared<Scene_Debug>());
+	}
+}
+
+void Scene_Battle::onCommandEnd() {
+	// If an event that changed status finishes without displaying a message window,
+	// we need this so it can update automatically the status_window
+	status_window->Refresh();
 }

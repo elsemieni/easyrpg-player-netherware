@@ -87,7 +87,6 @@ void Scene_Save::Action(int index) {
 	Main_Data::game_data.title = title;
 
 	Main_Data::game_data.system.save_slot = index + 1;
-	//Main_Data::game_data.system.save_count = Main_Data::game_data.system.save_count + 1; //netherware fix: https://github.com/EasyRPG/Player/pull/1473/
 
 	Game_Map::PrepareSave();
 
@@ -98,9 +97,11 @@ void Scene_Save::Action(int index) {
 		filename = FileFinder::MakePath((*tree).directory_path, save_file);
 	}
 
-	Main_Data::game_data.title.timestamp = LSD_Reader::GenerateTimestamp();
-
-	LSD_Reader::Save(filename, Main_Data::game_data, Player::encoding);
+	LSD_Reader::PrepareSave(Main_Data::game_data);
+	auto data_copy = LSD_Reader::ClearDefaults(Main_Data::game_data, Game_Map::GetMapInfo(), Game_Map::GetMap());
+	// RPG_RT saves always have the scene set to this.
+	data_copy.system.scene = RPG::SaveSystem::Scene_file;
+	LSD_Reader::Save(filename, data_copy, Player::encoding);
 
 #ifdef EMSCRIPTEN
 	// Save changed file system

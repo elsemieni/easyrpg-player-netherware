@@ -16,7 +16,7 @@
  */
 
 // Headers
-#define _USE_MATH_DEFINES //netherware fix for screen shake, ref by https://github.com/EasyRPG/Player/pull/1548
+#define _USE_MATH_DEFINES
 #include "bitmap.h"
 #include "data.h"
 #include "game_battle.h"
@@ -27,15 +27,14 @@
 #include "main_data.h"
 #include "output.h"
 #include "utils.h"
-//netherware fix: patch to allow screen shake
-//referenced by https://github.com/EasyRPG/Player/pull/1548
 #include <cmath>
+
 static constexpr int kShakeContinuousTimeStart = 65535;
 
 Game_Screen::Game_Screen() :
 	data(Main_Data::game_data.screen)
 {
-	Reset();
+	Reset(false);
 }
 
 void Game_Screen::CreatePicturesFromSave() {
@@ -50,24 +49,24 @@ void Game_Screen::CreatePicturesFromSave() {
 	}
 }
 
-void Game_Screen::Reset() {
-	//netherware fix: https://github.com/EasyRPG/Player/pull/1555
+void Game_Screen::Reset(bool is_load_savegame) {
 	if (Main_Data::game_data.pictures.size() < pictures.size()) {
 		pictures.resize(Main_Data::game_data.pictures.size());
 	}
-
 	for (auto& p : pictures) {
 		if (p) {
 			p->Erase(false);
 		}
 	}
 
-	data.flash_red = 0;
-	data.flash_green = 0;
-	data.flash_blue = 0;
+	if (!is_load_savegame) {
+		data.flash_red = 0;
+		data.flash_green = 0;
+		data.flash_blue = 0;
+		data.flash_time_left = 0;
+		data.flash_current_level = 0;
+	}
 	flash_sat = 0;
-	data.flash_time_left = 0;
-	data.flash_current_level = 0;
 	flash_period = 0;
 
 	if (data.tint_current_red < 0 ||
@@ -79,15 +78,6 @@ void Game_Screen::Reset() {
 		data.tint_current_blue = 100;
 		data.tint_current_sat = 100;
 	}
-
-	//netherware fix: patch to allow screen shake
-	//referenced by https://github.com/EasyRPG/Player/pull/1548
-	/*data.shake_strength = 0;
-	data.shake_speed = 0;
-	data.shake_time_left = 0;
-	data.shake_position = 0;
-	data.shake_continuous = false;
-	shake_direction = 1;*/
 
 	movie_filename = "";
 	movie_pos_x = 0;
@@ -153,18 +143,19 @@ void Game_Screen::FlashBegin(int r, int g, int b, int s, int tenths) {
 	FlashOnce(r, g, b, s, tenths);
 
 	flash_period = data.flash_time_left;
+	data.flash_continuous = true;
 }
 
 void Game_Screen::FlashEnd() {
 	data.flash_time_left = 0;
 	flash_period = 0;
+	data.flash_continuous = false;
 }
 
 void Game_Screen::ShakeOnce(int power, int speed, int tenths) {
 	data.shake_strength = power;
 	data.shake_speed = speed;
 	data.shake_time_left = tenths;
-	//data.shake_position = 0; //netherware fix: referenced by https://github.com/EasyRPG/Player/pull/1548
 	data.shake_continuous = false;
 	// Shake position is not reset in RPG_RT, so that multiple shakes
 	// which interrupt each other flow smoothly.
@@ -173,10 +164,6 @@ void Game_Screen::ShakeOnce(int power, int speed, int tenths) {
 void Game_Screen::ShakeBegin(int power, int speed) {
 	data.shake_strength = power;
 	data.shake_speed = speed;
-	//netherware fix: patch to allow screen shake
-	//referenced by https://github.com/EasyRPG/Player/pull/1548
-	//data.shake_time_left = 0;
-	//data.shake_position = 0;
 	data.shake_time_left = kShakeContinuousTimeStart;
 	data.shake_continuous = true;
 	// Shake position is not reset in RPG_RT, so that multiple shakes
@@ -184,7 +171,7 @@ void Game_Screen::ShakeBegin(int power, int speed) {
 }
 
 void Game_Screen::ShakeEnd() {
-	data.shake_position = 0; //netherware fix: referenced by https://github.com/EasyRPG/Player/pull/1548
+	data.shake_position = 0;
 	data.shake_time_left = 0;
 	data.shake_continuous = false;
 }
@@ -258,16 +245,15 @@ void Game_Screen::Update() {
 	if (data.flash_time_left > 0) {
 		data.flash_current_level = data.flash_current_level - (data.flash_current_level / data.flash_time_left);
 		data.flash_time_left = data.flash_time_left - 1;
-		if (data.flash_time_left <= 0)
-			data.flash_time_left = data.flash_continuous ? flash_period : 0;
+		if (data.flash_time_left <= 0) {
+			data.flash_time_left = 0;
+			if (data.flash_continuous) {
+				data.flash_time_left = flash_period;
+				data.flash_current_level = flash_sat;
+			}
+		}
 	}
 
-	//netherware fix: patch to allow screen shake
-	//referenced by https://github.com/EasyRPG/Player/pull/1548
-
-	/*if (data.shake_continuous || data.shake_time_left > 0 || data.shake_position != 0) {
-		double delta = (data.shake_strength * data.shake_speed * shake_direction) / 10.0;
-		if (data.shake_time_left <= 1 && data.shake_position * (data.shake_position + delta) < 0)*/
 	if (data.shake_continuous || data.shake_time_left > 0) {
 		--data.shake_time_left;
 		if (data.shake_continuous || data.shake_time_left > 0) {
@@ -277,22 +263,12 @@ void Game_Screen::Update() {
 			int amplitude = 1 + 2 * data.shake_strength;
 			int newpos = amplitude * sin((data.shake_time_left * 4 * (data.shake_speed + 2)) % 256 * M_PI / 128);
 			int cutoff = (data.shake_speed * amplitude / 8) + 1;
-			data.shake_position = Utils::Clamp(newpos, data.shake_position - cutoff, data.shake_position + cutoff);
-		} else {
-			//=============================================================================
-			data.shake_position = 0;
-			/*else
-                data.shake_position = data.shake_position + (int)delta;
-            if (data.shake_position > data.shake_strength * 2)
-                shake_direction = -1;
-            if (data.shake_position < -data.shake_strength * 2)
-                shake_direction = 1;
 
-            if (data.shake_time_left > 0)
-                data.shake_time_left = data.shake_time_left - 1;*/
+			data.shake_position = Utils::Clamp<int>(newpos, data.shake_position - cutoff, data.shake_position + cutoff);
+		} else {
+			data.shake_position = 0;
 			data.shake_time_left = 0;
 		}
-		//=============================================================================
 	}
 
 	for (const auto& picture : pictures) {

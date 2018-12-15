@@ -43,6 +43,12 @@ public:
 	 */
 	Game_Battler();
 
+	virtual int MaxHpValue() const = 0;
+
+	virtual int MaxStatBattleValue() const = 0;
+
+	virtual int MaxStatBaseValue() const = 0;
+
 	/**
 	 * Gets if battler has a state.
 	 *
@@ -57,6 +63,11 @@ public:
 	 * @return vector containing the IDs of all states the battler has.
 	 */
 	std::vector<int16_t> GetInflictedStates() const;
+
+	/**
+	 * @return true battler evades all physical attacks.
+	 */
+	bool EvadesAllPhysicalAttacks() const;
 
 	/**
 	 * Apply effects of Conditions to Battler
@@ -81,7 +92,7 @@ public:
 	 *
 	 * @return First non-normal restriction or normal if not restricted
 	 */
-	int GetSignificantRestriction();
+	RPG::State::Restriction GetSignificantRestriction() const;
 
 	/**
 	 * Gets the Battler ID.
@@ -136,6 +147,20 @@ public:
 	 */
 	void ShiftAttributeRate(int attribute_id, int shift);
 
+	/*
+	 * @return true if we can shift the attribute rate by shift
+	 */
+	bool CanShiftAttributeRate(int attribute_id, int shift) const;
+
+	/**
+	 * Gets the current modifier (buff/debuff) to an attribute rate.
+	 * The shift is cleared after the battle ended.
+	 *
+	 * @param attribute_id Attribute modified
+	 * @return shift Shift applied.
+	 */
+	int GetAttributeRateShift(int attribute_id);
+
 	/**
 	 * Gets probability that a state can be inflicted on this actor.
 	 *
@@ -151,6 +176,14 @@ public:
 	 * @return Attribute resistence
 	 */
 	virtual int GetAttributeModifier(int attribute_id) const = 0;
+
+	/**
+	 * Gets the final effect multiplier when a skill/attack is targeting this battler.
+	 *
+	 * @param attributes set for the incoming action
+	 * @return effect multiplier
+	 */
+	float GetAttributeMultiplier(const std::vector<bool>& attributes_set) const;
 
 	/**
 	 * Gets the characters name
@@ -330,7 +363,7 @@ public:
 	 * @param item_id ID if item to use
 	 * @return true if item affected anything
 	 */
-	virtual bool UseItem(int item_id);
+	virtual bool UseItem(int item_id, const Game_Battler* source);
 
 	/**
 	 * Applies the effects of a skill.
@@ -339,9 +372,10 @@ public:
 	 * Does not reduce the MP, use Game_Party->UseSkill for this.
 	 *
 	 * @param skill_id ID of skill to use
+	 * @param source battler who threw the skill
 	 * @return true if skill affected anything
 	 */
-	virtual bool UseSkill(int skill_id);
+	virtual bool UseSkill(int skill_id, const Game_Battler* source);
 
 	/**
 	 * Calculates the Skill costs including all modifiers.
@@ -379,12 +413,30 @@ public:
 	 */
 	void SetAgiModifier(int modifier);
 
+	void ChangeAtkModifier(int modifier);
+
+	void ChangeDefModifier(int modifier);
+
+	void ChangeSpiModifier(int modifier);
+
+	void ChangeAgiModifier(int modifier);
+
 	/**
 	 * Adds a State.
 	 *
 	 * @param state_id ID of state to add.
 	 */
 	virtual void AddState(int state_id);
+
+	/**
+	 * Filters out all states that can't be applied due to their priority being
+	 * < 10 of the most significant state.
+	 *
+	 * @param states in-out parameter of states.
+	 *
+	 * @return The number of states removed.
+	 */
+	int FilterInapplicableStates(std::vector<int16_t>& states) const;
 
 	/**
 	 * Removes a State.
@@ -474,13 +526,6 @@ public:
 	 * @return true if a weapon is having preempt attribute
 	 */
 	virtual bool HasPreemptiveAttack() const;
-
-	/**
-	 * Sets defence state (next turn, defense is doubled)
-	 *
-	 * @param defend new defence state
-	 */
-	void SetDefending(bool defend);
 
 	enum BattlerType {
 		Type_Ally,
@@ -583,6 +628,9 @@ public:
 	 */
 	std::vector<int16_t> BattlePhysicalStateHeal(int physical_rate);
 
+	void SetBattleOrderAgi(int val);
+	int GetBattleOrderAgi();
+
 	void SetLastBattleAction(int battle_action);
 
 	int GetLastBattleAction() const;
@@ -595,6 +643,11 @@ public:
 	 */
 	virtual void ResetBattle();
 
+	/**
+	 * @return Effective physical hit rate modifier from inflicted states.
+	 */
+	int GetHitChanceModifierFromStates() const;
+
 protected:
 	/** Gauge for RPG2k3 Battle */
 	int gauge;
@@ -603,7 +656,6 @@ protected:
 	BattleAlgorithmRef battle_algorithm;
 
 	bool charged;
-	bool defending;
 	int atk_modifier;
 	int def_modifier;
 	int spi_modifier;
@@ -614,6 +666,8 @@ protected:
 	int battle_combo_times;
 
 	std::vector<int> attribute_shift;
+
+	int battle_order = 0;
 };
 
 #endif

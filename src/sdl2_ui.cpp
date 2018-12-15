@@ -25,10 +25,7 @@
 #include "sdl2_ui.h"
 
 #ifdef _WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
+#define NOMINMAX //netherware fix: para que compile en visual studio po oe
 #  include <windows.h>
 #elif defined(__ANDROID__)
 #  include <jni.h>
@@ -55,10 +52,10 @@
 //netherware fix: include game switches for some event manipulating
 #include "game_switches.h"
 
-#include "audio.h"
-
 //netherware fix : global joystick handler
 SDL_Joystick* NethGloJoystickHandler;
+
+#include "audio.h"
 
 #ifdef SUPPORT_AUDIO
 
@@ -123,7 +120,7 @@ Sdl2Ui::Sdl2Ui(long width, long height, bool fullscreen, int zoom) :
 
 	SetTitle(GAME_TITLE);
 
-	//netherware fix: dejar el handler en la variable global
+		//netherware fix: dejar el handler en la variable global
 	NethGloJoystickHandler = nullptr;
 
 #if (defined(USE_JOYSTICK) && defined(SUPPORT_JOYSTICK)) || (defined(USE_JOYSTICK_AXIS) && defined(SUPPORT_JOYSTICK_AXIS)) || (defined(USE_JOYSTICK_HAT) && defined(SUPPORT_JOYSTICK_HAT))
@@ -132,7 +129,7 @@ Sdl2Ui::Sdl2Ui(long width, long height, bool fullscreen, int zoom) :
 	}
 
 	SDL_JoystickEventState(1);
-	NethGloJoystickHandler = SDL_JoystickOpen(0);
+	SDL_JoystickOpen(0);
 #endif
 
 #if defined(USE_MOUSE) && defined(SUPPORT_MOUSE)
@@ -491,7 +488,7 @@ void Sdl2Ui::ProcessEvent(SDL_Event &evnt) {
 			ProcessFingerEvent(evnt);
 			return;
 
-		//netherware fix: conectar joystick
+			//netherware fix: conectar joystick
 	    case SDL_JOYDEVICEADDED:
 	        {
 	            //evnt.which = index joystick de cual se agrego
@@ -512,7 +509,7 @@ void Sdl2Ui::ProcessEvent(SDL_Event &evnt) {
                 if (true) { //if (evtt.which == 0) {
                     //forzar pausa en el juego
                     if (&Game_Switches && Game_Switches.IsValid(2241)) {
-                        Game_Switches[2241] = 1;
+                        Game_Switches.Set(2241, 1);
                     }
 
                     SDL_JoystickClose(NethGloJoystickHandler);
