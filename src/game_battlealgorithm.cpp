@@ -1689,6 +1689,7 @@ bool Game_BattleAlgorithm::Item::ActionIsPossible() const {
 Game_BattleAlgorithm::Defend::Defend(Game_Battler* source) :
 	AlgorithmBase(Type::Defend, source) {
 	// no-op
+		source->SetIsDefending(true);
 }
 
 std::string Game_BattleAlgorithm::Defend::GetStartMessage() const {

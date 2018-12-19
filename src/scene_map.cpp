@@ -167,13 +167,14 @@ void Scene_Map::Update() {
 	if (Game_Message::visible)
 		return;
 
+    bool force_menu_calling = false;
 	if (Player::debug_flag) {
 		// ESC-Menu calling can be force called when TestPlay mode is on and cancel is pressed 5 times while holding SHIFT
 		if (Input::IsPressed(Input::SHIFT)) {
 			if (Input::IsTriggered(Input::CANCEL)) {
 				debug_menuoverwrite_counter++;
 				if (debug_menuoverwrite_counter >= 5) {
-					Game_Temp::menu_calling = true;
+                    force_menu_calling = true;
 					debug_menuoverwrite_counter = 0;
 				}
 			}
@@ -189,33 +190,39 @@ void Scene_Map::Update() {
 		}
 	}
 
-	if (!Main_Data::game_player->IsMoving()) {
-		if (Game_Temp::menu_calling) {
+    if (!Main_Data::game_player->IsMoving() || Game_Interpreter::IsImmediateCall() || force_menu_calling) {
+        if (Main_Data::game_data.party_location.menu_calling || Game_Interpreter::IsMenuCalling() || force_menu_calling) {
+            Game_Interpreter::ResetEventCalling();
 			CallMenu();
 			return;
 		}
 
-		if (Game_Temp::name_calling) {
+        if (Game_Interpreter::IsNameCalling()) {
+            Game_Interpreter::ResetEventCalling();
 			CallName();
 			return;
 		}
 
-		if (Game_Temp::shop_calling) {
+        if (Game_Interpreter::IsShopCalling()) {
+            Game_Interpreter::ResetEventCalling();
 			CallShop();
 			return;
 		}
 
-		if (Game_Temp::save_calling) {
+        if (Game_Interpreter::IsSaveCalling()) {
+            Game_Interpreter::ResetEventCalling();
 			CallSave();
 			return;
 		}
 
-		if (Game_Temp::load_calling) {
+        if (Game_Interpreter::IsLoadCalling()) {
+            Game_Interpreter::ResetEventCalling();
 			CallLoad();
 			return;
 		}
 
 		if (Game_Temp::battle_calling) {
+            Game_Interpreter::ResetEventCalling();
 			CallBattle();
 			return;
 		}
@@ -260,21 +267,19 @@ void Scene_Map::CallBattle() {
 }
 
 void Scene_Map::CallShop() {
-	Game_Temp::shop_calling = false;
 	Game_Temp::transition_menu = true;
 
 	Scene::Push(std::make_shared<Scene_Shop>());
 }
 
 void Scene_Map::CallName() {
-	Game_Temp::name_calling = false;
 	Game_Temp::transition_menu = true;
 
 	Scene::Push(std::make_shared<Scene_Name>());
 }
 
 void Scene_Map::CallMenu() {
-	Game_Temp::menu_calling = false;
+    Main_Data::game_data.party_location.menu_calling = false;
 	Game_Temp::transition_menu = true;
 
 	// TODO: Main_Data::game_player->Straighten();
@@ -291,14 +296,12 @@ void Scene_Map::CallMenu() {
 }
 
 void Scene_Map::CallSave() {
-	Game_Temp::save_calling = false;
 	Game_Temp::transition_menu = true;
 
 	Scene::Push(std::make_shared<Scene_Save>());
 }
 
 void Scene_Map::CallLoad() {
-	Game_Temp::load_calling = false;
 	Game_Temp::transition_menu = true;
 
 	Scene::Push(std::make_shared<Scene_Load>());

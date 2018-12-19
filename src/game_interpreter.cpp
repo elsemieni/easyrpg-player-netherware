@@ -62,6 +62,8 @@ namespace {
 	static Game_Interpreter* transition_owner = nullptr;
 }
 
+Game_Interpreter::EventCalling Game_Interpreter::event_calling = {};
+
 Game_Interpreter::Game_Interpreter(int _depth, bool _main_flag) {
 	depth = _depth;
 	main_flag = _main_flag;
@@ -202,11 +204,11 @@ void Game_Interpreter::Update() {
 		}
 
 		if ((Game_Temp::battle_calling && !Game_Temp::battle_running) ||
-			Game_Temp::shop_calling ||
-			Game_Temp::name_calling ||
-			Game_Temp::menu_calling ||
-			Game_Temp::save_calling ||
-			Game_Temp::load_calling ||
+                IsShopCalling() ||
+                IsNameCalling() ||
+                IsMenuCalling() ||
+                IsSaveCalling() ||
+                IsLoadCalling() ||
 			Game_Temp::to_title ||
 			Game_Temp::gameover) {
 
@@ -1195,10 +1197,9 @@ bool Game_Interpreter::CommandChangePartyMember(RPG::EventCommand const& com) { 
 	} else {
 		// Remove members
 		Main_Data::game_party->RemoveActor(id);
-
-		CheckGameOver();
 	}
 
+	CheckGameOver();
 	Game_Map::SetNeedRefresh(Game_Map::Refresh_Map);
 
 	// Continue
@@ -1216,6 +1217,7 @@ bool Game_Interpreter::CommandChangeExp(RPG::EventCommand const& com) { // Code 
 		actor->ChangeExp(actor->GetExp() + value, com.parameters[5] != 0);
 	}
 
+	CheckGameOver();
 	return true;
 }
 
@@ -1230,6 +1232,7 @@ bool Game_Interpreter::CommandChangeLevel(RPG::EventCommand const& com) { // Cod
 		actor->ChangeLevel(actor->GetLevel() + value, com.parameters[5] != 0);
 	}
 
+	CheckGameOver();
 	return true;
 }
 
@@ -1279,6 +1282,7 @@ bool Game_Interpreter::CommandChangeParameters(RPG::EventCommand const& com) { /
 			break;
 		}
 	}
+	CheckGameOver();
 	return true;
 }
 
@@ -1293,6 +1297,7 @@ bool Game_Interpreter::CommandChangeSkills(RPG::EventCommand const& com) { // Co
 			actor->LearnSkill(skill_id);
 	}
 
+	CheckGameOver();
 	return true;
 }
 
@@ -1361,6 +1366,7 @@ bool Game_Interpreter::CommandChangeEquipment(RPG::EventCommand const& com) { //
 		}
 	}
 
+	CheckGameOver();
 	return true;
 }
 
@@ -1408,6 +1414,7 @@ bool Game_Interpreter::CommandChangeSP(RPG::EventCommand const& com) { // Code 1
 		actor->SetSp(sp);
 	}
 
+	CheckGameOver();
 	return true;
 }
 
@@ -1422,10 +1429,10 @@ bool Game_Interpreter::CommandChangeCondition(RPG::EventCommand const& com) { //
 		} else {
 			actor->AddState(state_id);
 			Game_Battle::SetNeedRefresh(true);
-			CheckGameOver();
 		}
 	}
 
+	CheckGameOver();
 	return true;
 }
 
@@ -1436,6 +1443,7 @@ bool Game_Interpreter::CommandFullHeal(RPG::EventCommand const& com) { // Code 1
 		actor->SetSp(actor->GetMaxSp());
 	}
 
+	CheckGameOver();
 	Game_Battle::SetNeedRefresh(true);
 
 	return true;
@@ -1461,7 +1469,6 @@ bool Game_Interpreter::CommandSimulatedAttack(RPG::EventCommand const& com) { //
 		result = std::max(0, result);
 		actor->ChangeHp(-result);
 
-		CheckGameOver();
 
 		if (com.parameters[6] != 0) {
 			Game_Variables.Set(com.parameters[7], result);
@@ -1469,6 +1476,7 @@ bool Game_Interpreter::CommandSimulatedAttack(RPG::EventCommand const& com) { //
 		}
 	}
 
+	CheckGameOver();
 	return true;
 }
 
@@ -3194,6 +3202,23 @@ bool Game_Interpreter::DefaultContinuation(RPG::EventCommand const& /* com */) {
 	index++;
 	return true;
 }
+
+void Game_Interpreter::ResetEventCalling() {
+    event_calling = {};
+    // FIXME: Need to separate immediate battle calls from events
+    // and SavePartyLocation::encounter_calling for random encounters.
+    Game_Temp::battle_calling = false;
+}
+
+
+bool Game_Interpreter::IsImmediateCall() {
+    return event_calling.load
+           || event_calling.save
+           || event_calling.name
+           || event_calling.shop
+           || event_calling.menu
+           || Game_Temp::battle_calling;
+};
 
 // Dummy Continuations
 

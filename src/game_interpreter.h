@@ -67,6 +67,41 @@ public:
 
 	virtual bool ExecuteCommand();
 
+	/**
+ * @return true if an immediate call is requested
+ */
+	static bool IsImmediateCall();
+
+	/**
+	 * Reset the event calling flags
+	 */
+	static void ResetEventCalling();
+
+	/**
+	 * @return true if interpreter wants to immediately call the main menu
+	 */
+	static bool IsMenuCalling();
+
+	/**
+	 * @return true if interpreter wants to immediately call the save menu
+	 */
+	static bool IsSaveCalling();
+
+	/**
+	 * @return true if interpreter wants to immediately call the load menu
+	 */
+	static bool IsLoadCalling();
+
+	/**
+	 * @return true if interpreter wants to immediately call the name actor menu
+	 */
+	static bool IsNameCalling();
+
+	/**
+	 * @return true if interpreter wants to immediately call the shop menu
+	 */
+	static bool IsShopCalling();
+
 protected:
 	friend class Game_Interpreter_Map;
 
@@ -235,6 +270,36 @@ protected:
 	} event_info;
 
 	FileRequestBinding request_id;
+
+	struct EventCalling {
+		bool menu = false;
+		bool shop = false;
+		bool name = false;
+		bool save = false;
+		bool load = false;
+	};
+	static EventCalling event_calling;
+
 };
+
+inline bool Game_Interpreter::IsMenuCalling() {
+	return event_calling.menu;
+}
+
+inline bool Game_Interpreter::IsSaveCalling() {
+	return event_calling.save;
+}
+
+inline bool Game_Interpreter::IsLoadCalling() {
+	return event_calling.load;
+}
+
+inline bool Game_Interpreter::IsNameCalling() {
+	return event_calling.name;
+}
+
+inline bool Game_Interpreter::IsShopCalling() {
+	return event_calling.shop;
+}
 
 #endif

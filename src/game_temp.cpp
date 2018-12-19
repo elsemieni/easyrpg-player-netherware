@@ -19,13 +19,8 @@
 #include "game_temp.h"
 #include "transition.h"
 
-bool Game_Temp::menu_calling;
 bool Game_Temp::battle_calling;
-bool Game_Temp::shop_calling;
 bool Game_Temp::inn_calling;
-bool Game_Temp::name_calling;
-bool Game_Temp::save_calling;
-bool Game_Temp::load_calling;
 bool Game_Temp::to_title;
 bool Game_Temp::gameover;
 bool Game_Temp::transition_processing;
@@ -51,16 +46,10 @@ int Game_Temp::battle_escape_mode;
 int Game_Temp::battle_defeat_mode;
 bool Game_Temp::battle_first_strike;
 int Game_Temp::battle_result;
-bool Game_Temp::restart_title_cache;
 
 void Game_Temp::Init() {
-	menu_calling = false;
 	battle_calling = false;
-	shop_calling = false;
 	inn_calling = false;
-	name_calling = false;
-	save_calling = false;
-	load_calling = false;
 	to_title = false;
 	gameover = false;
 	transition_processing = false;
@@ -86,5 +75,4 @@ void Game_Temp::Init() {
 	battle_defeat_mode = 0;
 	battle_first_strike = false;
 	battle_result = BattleAbort;
-	restart_title_cache = false;
 }

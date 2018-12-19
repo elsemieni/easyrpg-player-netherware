@@ -60,7 +60,7 @@ namespace Game_Map {
 	 * Disposes Game_Map.
 	 * @param is_load_savegame true if we're calling this while loading a saved game.
 	 */
-	void Dispose(bool is_load_savegame);
+	void Dispose();
 
 	/**
 	 * Setups a map.
@@ -446,7 +446,7 @@ namespace Game_Map {
 	 *
 	 * @return the game interpreter.
 	 */
-	Game_Interpreter& GetInterpreter();
+    Game_Interpreter_Map& GetInterpreter();
 
 	/**
 	 * Destroy an interpreter after all events and common events have been updated.
@@ -657,7 +657,10 @@ namespace Game_Map {
 		 *
 		 * @param init if true will always reset position, even on looping maps
 		 */
-		void UpdatePosition(bool init = false);
+		void ResetPositionX();
+		void ResetPositionY();
+		void ScrollRight(int distance);
+		void ScrollDown(int distance);
 
 		/** Update autoscrolling BG (call every frame). */
 		void Update();

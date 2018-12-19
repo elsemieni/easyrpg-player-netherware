@@ -289,7 +289,6 @@ void Player::Update(bool update_scene) {
 	} else if (reset_flag) {
 		reset_flag = false;
 		if (Scene::Find(Scene::Title) && Scene::instance->type != Scene::Title) {
-			Game_Temp::restart_title_cache = true;
 			Scene::PopUntil(Scene::Title);
 			// Fade out music and stop sound effects before returning
 			Game_System::BgmFade(800);
@@ -636,7 +635,7 @@ void Player::CreateGameObjects() {
 		Output::Debug("Loading game %s", game_title.c_str());
         title << game_title << ""; //netherware fix
 	} else {
-		Output::Warning("Could not read game title.");
+		Output::Debug("Could not read game title.");
 	}
 	title << GAME_TITLE;
 	DisplayUi->SetTitle(title.str());
@@ -796,6 +795,7 @@ void Player::LoadSavegame(const std::string& save_name) {
 
 	Scene::PopUntil(Scene::Title);
 	Game_Temp::Init();
+    Game_Map::Dispose();
 
 	Main_Data::game_data = *save.get();
 	Main_Data::game_data.system.Fixup();
