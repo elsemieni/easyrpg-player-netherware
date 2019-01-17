@@ -26,6 +26,9 @@
 #include "font.h"
 #include "player.h"
 
+//netherware fix: include game switches for some strings manipulating
+#include "game_switches.h"
+
 Window_SaveFile::Window_SaveFile(int ix, int iy, int iwidth, int iheight) :
 	Window_Base(ix, iy, iwidth, iheight),
 	index(0), hero_hp(0), hero_level(0), corrupted(false), has_save(false) {
@@ -39,9 +42,24 @@ Window_SaveFile::Window_SaveFile(int ix, int iy, int iwidth, int iheight) :
 void Window_SaveFile::UpdateCursorRect() {
 	Rect rect = Rect();
 
+    //==========================================================================
+    //netherware fix: detect language
+    //1001: ESP
+    //1723: SC
+    //1724: TC
+    std::string replace_saveload_string = Data::terms.file;
+
+    if (&Game_Switches && Game_Switches.IsValid(1001) && Game_Switches.IsValid(1724)) {
+        if (Game_Switches.Get(1001)) replace_saveload_string = "Archivo";
+        else if (Game_Switches.Get(1723)) replace_saveload_string = "档案";
+        else if (Game_Switches.Get(1724)) replace_saveload_string = "檔案";
+    }
+
+    //==========================================================================
+
 	if (GetActive()) {
 		std::ostringstream out;
-		out << Data::terms.file << std::setw(2) << std::setfill(' ') << index + 1;
+		out << replace_saveload_string << std::setw(2) << std::setfill(' ') << index + 1; //netherware fix
 		rect = Rect(0, 0, Font::Default()->GetSize(out.str()).width + 6, 16);
 	}
 
@@ -75,8 +93,23 @@ void Window_SaveFile::SetHasSave(bool valid) {
 void Window_SaveFile::Refresh() {
 	contents->Clear();
 
+    //==========================================================================
+    //netherware fix: detect language
+    //1001: ESP
+    //1723: SC
+    //1724: TC
+    std::string replace_saveload_string = Data::terms.file;
+
+    if (&Game_Switches && Game_Switches.IsValid(1001) && Game_Switches.IsValid(1724)) {
+        if (Game_Switches.Get(1001)) replace_saveload_string = "Archivo";
+        else if (Game_Switches.Get(1723)) replace_saveload_string = "档案";
+        else if (Game_Switches.Get(1724)) replace_saveload_string = "檔案";
+    }
+
+    //==========================================================================
+
 	std::ostringstream out;
-	out << Data::terms.file << std::setw(2) << std::setfill(' ') << index + 1;
+	out << replace_saveload_string << std::setw(2) << std::setfill(' ') << index + 1; //out << Data::terms.file << std::setw(2) << std::setfill(' ') << index + 1; //netherware fix
 	contents->TextDraw(4, 2, has_save ? Font::ColorDefault : Font::ColorDisabled, out.str());
 
 	if (corrupted) {

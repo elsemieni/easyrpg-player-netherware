@@ -32,6 +32,10 @@
 #include "bitmap.h"
 #include "reader_util.h"
 
+//netherware fix: include game switches for some strings manipulating
+#include "game_switches.h"
+
+
 Scene_File::Scene_File(std::string message) :
 	message(message), latest_time(0), latest_slot(0) {
 	top_index = 0;
@@ -52,7 +56,35 @@ static std::unique_ptr<Sprite> makeBorderSprite(int y) {
 void Scene_File::Start() {
 	// Create the windows
 	help_window.reset(new Window_Help(0, 0, SCREEN_TARGET_WIDTH, 32));
-	help_window->SetText(message);
+
+    //==========================================================================
+	//netherware fix: detect language
+	//1001: ESP
+	//1723: SC
+	//1724: TC
+	if (Scene::type == Scene::Save) {
+		if (&Game_Switches && Game_Switches.IsValid(1001) && Game_Switches.IsValid(1724)) {
+			if (Game_Switches.Get(1001)) help_window->SetText("Guardar la partida");
+			else if (Game_Switches.Get(1723)) help_window->SetText("保存");
+			else if (Game_Switches.Get(1724)) help_window->SetText("儲存");
+			else help_window->SetText(message);//default
+		} else {
+			help_window->SetText(message);
+		}
+	} else if (Scene::type == Scene::Load) {
+		if (&Game_Switches && Game_Switches.IsValid(1001) && Game_Switches.IsValid(1724)) {
+			if (Game_Switches.Get(1001)) help_window->SetText("Cargar la partida");
+			else if (Game_Switches.Get(1723)) help_window->SetText("载入");
+			else if (Game_Switches.Get(1724)) help_window->SetText("載入");
+			else help_window->SetText(message);//default
+		} else {
+			help_window->SetText(message);
+		}
+	}
+
+    //==========================================================================
+
+    //help_window->SetText(message); //netherware fix
 	help_window->SetZ(Priority_Window + 1);
 
 	border_top = makeBorderSprite(32);
@@ -106,8 +138,16 @@ void Scene_File::Start() {
 					party[0].second = savegame->title.face1_name;
 				}
 
-				w->SetParty(party, savegame->title.hero_name, savegame->title.hero_hp,
-					savegame->title.hero_level);
+				//netherware fix
+                char buf[100] = {0};
+				std::time_t now = LSD_Reader::ToUnixTimestamp(savegame->title.timestamp);
+                std::strftime(buf, sizeof(buf), "%m/%d %H:%M:%S", std::localtime(&now));
+				std::string elapsed_time(buf);
+				w->SetParty(party, elapsed_time, savegame->title.hero_hp,
+							savegame->title.hero_level);
+
+				/*w->SetParty(party, savegame->title.hero_name, savegame->title.hero_hp,
+					savegame->title.hero_level);*/
 				w->SetHasSave(true);
 
 				if (savegame->title.timestamp > latest_time) {

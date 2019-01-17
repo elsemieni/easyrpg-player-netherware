@@ -717,6 +717,7 @@ bool Game_Interpreter::CommandInputNumber(RPG::EventCommand const& com) { // cod
 
 	Game_Message::message_waiting = true;
 	Game_Message::owner_id = event_id;
+    wait_messages = true;
 
 	Game_Message::num_input_start = 0;
 	Game_Message::num_input_variable_id = com.parameters[1];
@@ -1633,8 +1634,14 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
     			Game_Variables.Set(2501, 0);
     			return true;
     			break;
+    			//next cases just skip to the next check block.
+		    case -101110:
+		    case -101111:
+		    case -101112:
+		        break;
 			default:
 				//default effect: execute End Event Processing
+				index = list.size();
 				break;
 		}
 	}
@@ -1645,7 +1652,6 @@ bool Game_Interpreter::CommandEndEventProcessing(RPG::EventCommand const& /* com
         index = list.size();
     }
 #endif
-
     return true;
 
 }

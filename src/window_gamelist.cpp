@@ -85,22 +85,25 @@ void Window_GameList::DrawErrorText() {
 		"If you followed a link and stranded here",
 		"please notify us (see About page)."
 #else
-		"Games must be in a direct subdirectory",
-		"and must have the files RPG_RT.ldb and",
-		"RPG_RT.lmt in their main directory.",
-		"",
-		"This engine only supports RPG Maker 2000",
-		"and 2003 games.",
-		"",
-		"RPG Maker XP, VX, VX Ace and MV are NOT",
-		"supported."
+  "If you are reading this message, ",
+  "probably your Desolate City installation",
+  "is broken. Please reinstall the game",
+  "for make it work properly. ",
+  "",
+  "If you are trying to open a RPG Maker ",
+  "2000/2003 game with this executable, ",
+  "please download the last EasyRPG ",
+  "Player instead: ",
+  "",
+  "https://easyrpg.org/player/downloads/"
+
 #endif
 	};
 
 #ifdef EMSCRIPTEN
 	contents->TextDraw(0, 0, Font::ColorKnockout, "The game was not found.");
 #else
-	contents->TextDraw(0, 0, Font::ColorKnockout, "No games found in the current directory.");
+	contents->TextDraw(0, 0, Font::ColorKnockout, "Game data was not found.");
 #endif
 
 	for (size_t i = 0; i < error_msg.size(); ++i) {
