@@ -22,6 +22,9 @@
 #include "main_data.h"
 #include "font.h"
 #include "player.h"
+#include "output.h"
+
+#include <regex>
 
 namespace Game_Message {
 	std::vector<std::string> texts;
@@ -61,7 +64,7 @@ void Game_Message::SemiClear() {
 	num_input_start = -1;
 	num_input_variable_id = 0;
 	num_input_digits_max = 0;
-	is_word_wrapped = false;
+	is_word_wrapped = true; //netherware fix
 }
 
 void Game_Message::FullClear() {
@@ -182,20 +185,26 @@ int Game_Message::WordWrap(const std::string& line, int limit, const std::functi
 	FontRef font = Font::Default();
 	Rect size;
 
+	//netherware fix: se adapta para eliminar comandos
+	std::regex command_regex("\\\\[a-zA-Z$!.|<>^_](\\[[0-9]*\\])?");
+
 	do {
 		line_count++;
-		size_t found = line.find(" ", start);
-		std::string wrapped = line.substr(start, found - start);
-		end_of_string = false;
+		size_t found = line.find(" ", start); //busca un espacio en la linea desde el punto de comienzo (el primero). Si no se encuentra, es -1
+		std::string wrapped = line.substr(start, found - start); //extrae la palabra entre el principio y donde se encontro el espacio (wrapped).
+		end_of_string = false; //no hay end of string aun
 		do {
-			lastfound = found;
-			found = line.find(" ", lastfound + 1);
-			if (found == std::string::npos) {
-				found = line.size();
+			lastfound = found; //ponemos que el ultimo encontrado es el que acabamos de encontrar
+			found = line.find(" ", lastfound + 1); //seguimos buscando espacios desde el ultimo punto
+			if (found == std::string::npos) { //si no encontramos espacios
+				found = line.size(); //la linea llega hasta el final
 			}
-			wrapped = line.substr(start, found - start);
-			size = font->GetSize(wrapped);
-		} while (found < line.size() - 1 && size.width < limit);
+			wrapped = line.substr(start, found - start); //extraemos la palabra que acabamos de encontrar
+
+			//limpiar wrapped de comandos maker
+			std::string clean_wrapped = std::regex_replace (wrapped,command_regex,"");
+			size = font->GetSize(clean_wrapped); //se obtiene sus dimensiones en pixeles
+		} while (found < line.size() - 1 && size.width < limit); //repitase hasta que que haya llegado al final del string recorriendo, o hasta que el ultimo texto extraido exceda el limite puesto (???)
 		if (found >= line.size() - 1) {
 			// It's end of the string, not a word-break
 			if (size.width < limit) {
