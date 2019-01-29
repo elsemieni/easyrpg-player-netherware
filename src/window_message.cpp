@@ -153,7 +153,7 @@ void Window_Message::StartMessageProcessing() {
 				ApplyTextInsertingCommands();
 				Game_Message::WordWrap(
 						Utils::EncodeUTF(text),
-						width - 24,
+						width - 0, //netherware fix: extender el limite del autowrap.
 						[&wrapped_text](const std::string& wrapped_line) {
 							wrapped_text.append(Utils::DecodeUTF32(wrapped_line)).append(1, U'\n');
 						}

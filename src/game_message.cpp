@@ -64,7 +64,7 @@ void Game_Message::SemiClear() {
 	num_input_start = -1;
 	num_input_variable_id = 0;
 	num_input_digits_max = 0;
-	is_word_wrapped = false; //netherware fix, desactivado por ahora
+	is_word_wrapped = true; //netherware fix, desactivado por ahora
 }
 
 void Game_Message::FullClear() {

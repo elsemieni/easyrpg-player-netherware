@@ -605,7 +605,13 @@ bool Game_Interpreter::CommandShowMessage(RPG::EventCommand const& com) { // cod
 	Game_Message::owner_id = event_id;
 
 	// Set first line
-	Game_Message::texts.push_back(com.string);
+    //netherware fix fix freeze for empty messages from emu files
+	if (com.string == "") {
+		Game_Message::texts.push_back(" ");
+	}
+	else {
+		Game_Message::texts.push_back(com.string);
+	}
 	line_count++;
 
 	for (; index + 1 < list.size(); index++) {
