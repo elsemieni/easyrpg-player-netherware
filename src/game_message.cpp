@@ -24,7 +24,7 @@
 #include "player.h"
 #include "output.h"
 
-#include <regex>
+//#include <regex>
 
 namespace Game_Message {
 	std::vector<std::string> texts;
@@ -64,7 +64,7 @@ void Game_Message::SemiClear() {
 	num_input_start = -1;
 	num_input_variable_id = 0;
 	num_input_digits_max = 0;
-	is_word_wrapped = true; //netherware fix, desactivado por ahora
+	is_word_wrapped = false; //netherware fix, desactivado por ahora
 }
 
 void Game_Message::FullClear() {
@@ -186,7 +186,7 @@ int Game_Message::WordWrap(const std::string& line, int limit, const std::functi
 	Rect size;
 
 	//netherware fix: se adapta para eliminar comandos
-	std::regex command_regex("\\\\[a-zA-Z$!.|<>^_](\\[[0-9]*\\])?");
+	//std::regex command_regex("\\\\[a-zA-Z$!.|<>^_](\\[[0-9]*\\])?");
 
 	do {
 		line_count++;
@@ -202,8 +202,9 @@ int Game_Message::WordWrap(const std::string& line, int limit, const std::functi
 			wrapped = line.substr(start, found - start); //extraemos la palabra que acabamos de encontrar
 
 			//limpiar wrapped de comandos maker
-			std::string clean_wrapped = std::regex_replace (wrapped,command_regex,"");
-			size = font->GetSize(clean_wrapped); //se obtiene sus dimensiones en pixeles
+			//std::string clean_wrapped = std::regex_replace (wrapped,command_regex,"");
+			//size = font->GetSize(clean_wrapped); //se obtiene sus dimensiones en pixeles
+            size = font->GetSize(wrapped); //se obtiene sus dimensiones en pixeles
 		} while (found < line.size() - 1 && size.width < limit); //repitase hasta que que haya llegado al final del string recorriendo, o hasta que el ultimo texto extraido exceda el limite puesto (???)
 		if (found >= line.size() - 1) {
 			// It's end of the string, not a word-break
